@@ -1,0 +1,37 @@
+# dados (FINDSum tem ~6.4 GB; baixe com scripts/fetch_findsum.py)
+data/
+!data/.gitkeep
+
+# artefatos de experimento
+outputs/
+runs/
+*.faiss
+*.index
+models/
+.cache/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# jupyter
+.ipynb_checkpoints/
+
+# ambiente / segredos
+.env
+.env.*
+!.env.example
+
+# editores e SO
+.vscode/
+.idea/
+.DS_Store
+*.swp
