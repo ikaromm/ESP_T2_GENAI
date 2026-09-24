@@ -35,23 +35,26 @@ class RetrievalConfig(BaseModel):
 
 
 class GenerationConfig(BaseModel):
-    """Parametros da LLM. Mantidos identicos entre C1 e C5."""
+    """Parametros da LLM. Mantidos identicos entre as configuracoes."""
 
-    model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    # Qwen3.5 nao tem tamanho 7B; os densos sao 0.8B, 2B, 4B, 9B e 27B. O 9B e o
+    # maior que cabe nos 12 GB da GPU em NF4 (~5,3 GB); o 27B pediria ~15 GB.
+    model_name: str = "Qwen/Qwen3.5-9B"
     load_in_4bit: bool = Field(
         default=True, description="quantizacao 4-bit, necessaria em GPU de 12 GB"
     )
-    # Os resumos de referencia do FINDSum-Liquidity tem ~1000 palavras em media
-    # (medido em val: min 384, max 1181), ou seja ~1300 tokens. Um limite menor
-    # truncaria a geracao e penalizaria a cobertura de TODAS as configuracoes.
+    # Os resumos de referencia do FINDSum-Liquidity tem ~1000 palavras de mediana
+    # (~1374 tokens). Um limite menor truncaria a geracao e penalizaria a
+    # cobertura de TODAS as configuracoes.
     max_new_tokens: int = Field(default=1536, gt=0)
     temperature: float = Field(default=0.0, ge=0.0, description="0 = geracao greedy")
     top_p: float = Field(default=1.0, gt=0.0, le=1.0)
     seed: int = 42
-    # Orcamento de prompt: ~3.5k tokens de contexto recuperado (12 x 220 palavras)
-    # + ~3.6k de dois exemplos com resumo integral + instrucoes.
+    # Medido: 4 exemplos com resumo integral + top_k=12 dao ~10,3 mil tokens;
+    # com top_k=27 (documento todo recuperado) sobem a ~14,3 mil. 16384 cobre os
+    # dois casos, e a VRAM permite (pico medido de 7,9 GB em 10,3 mil tokens).
     max_input_tokens: int = Field(
-        default=12288, gt=0, description="orcamento de contexto do prompt"
+        default=16384, gt=0, description="orcamento de contexto do prompt"
     )
     dtype: str = "bfloat16"
 
@@ -65,9 +68,25 @@ class ExperimentArm(BaseModel):
 
     id: str
     label: str
-    use_rag: bool
+    context_mode: str = Field(
+        pattern="^(full|retrieved|truncated)$",
+        description=(
+            "full = documento inteiro no prompt; retrieved = top_k trechos por "
+            "similaridade (RAG); truncated = primeiros top_k trechos na ordem "
+            "original, controle para isolar o efeito de recuperar vs cortar"
+        ),
+    )
     example_strategy: str = Field(pattern="^(none|fixed|random|dynamic)$")
     n_examples: int = Field(default=0, ge=0)
+
+    @property
+    def use_rag(self) -> bool:
+        """Se o contexto foi escolhido por recuperacao."""
+        return self.context_mode == "retrieved"
+
+    @property
+    def uses_full_document(self) -> bool:
+        return self.context_mode == "full"
 
     @model_validator(mode="after")
     def _check_examples(self) -> ExperimentArm:
@@ -80,51 +99,93 @@ class ExperimentArm(BaseModel):
         return self
 
 
+# C1 recebe o documento INTEIRO: ele cabe na janela do modelo (7,3 mil tokens de
+# mediana contra 262 mil), logo truncar seria construir um baseline artificial.
+# Isso muda o que H1 afirma -- deixa de ser "o RAG da mais informacao" e passa a
+# ser "um recorte curado supera o documento inteiro", testavel pela degradacao
+# conhecida de atencao em contexto longo.
+#
+# C1t existe para separar os dois efeitos: com o MESMO orcamento de C2, mas
+# cortando em vez de recuperar, isola quanto do resultado vem de recuperar e
+# quanto vem apenas de reduzir o contexto.
+N_EXAMPLES = 4
+
 DEFAULT_ARMS: list[ExperimentArm] = [
     ExperimentArm(
-        id="C1", label="Baseline (sem RAG, sem few-shot)", use_rag=False, example_strategy="none"
+        id="C1",
+        label="Baseline (documento inteiro, sem few-shot)",
+        context_mode="full",
+        example_strategy="none",
     ),
-    ExperimentArm(id="C2", label="RAG", use_rag=True, example_strategy="none"),
     ExperimentArm(
-        id="C3", label="RAG + few-shot fixo", use_rag=True, example_strategy="fixed", n_examples=2
+        id="C1t",
+        label="Controle (truncado no orcamento do RAG, sem few-shot)",
+        context_mode="truncated",
+        example_strategy="none",
+    ),
+    ExperimentArm(
+        id="C2", label="RAG", context_mode="retrieved", example_strategy="none"
+    ),
+    ExperimentArm(
+        id="C3",
+        label="RAG + few-shot fixo",
+        context_mode="retrieved",
+        example_strategy="fixed",
+        n_examples=N_EXAMPLES,
     ),
     ExperimentArm(
         id="C4",
         label="RAG + few-shot aleatorio",
-        use_rag=True,
+        context_mode="retrieved",
         example_strategy="random",
-        n_examples=2,
+        n_examples=N_EXAMPLES,
     ),
     ExperimentArm(
         id="C5",
         label="RAG + few-shot dinamico",
-        use_rag=True,
+        context_mode="retrieved",
         example_strategy="dynamic",
-        n_examples=2,
+        n_examples=N_EXAMPLES,
     ),
 ]
 
 
 class DataConfig(BaseModel):
-    """Escopo dos dados usados no experimento."""
+    """Escopo dos dados usados no experimento.
+
+    Os conjuntos vem de um manifesto congelado (`scripts/build_splits.py`), nao
+    dos splits originais do FINDSum: aqui nada e treinado, e o que se precisa e
+    separar base de exemplos, desenvolvimento e avaliacao com empresa unica.
+    """
 
     root: Path = Path("data/raw/findsum")
     task: Task = Task.LIQUIDITY
-    eval_split: str = "val"
-    example_split: str = "train"
-    n_eval_docs: int = Field(default=100, gt=0, description="documentos avaliados")
-    n_example_docs: int = Field(
-        default=500, gt=0, description="documentos que formam a base de exemplos"
+    manifest: Path = Path("data/interim/splits-liquidity.json")
+    eval_set: str = Field(default="dev", description="conjunto do manifesto a avaliar")
+    example_set: str = Field(default="examples", description="conjunto das demonstracoes")
+    n_eval_docs: int | None = Field(
+        default=50,
+        gt=0,
+        description="limita o conjunto avaliado; None usa ele inteiro",
     )
+    n_example_docs: int | None = Field(default=None, gt=0)
     example_max_words: int = Field(
-        default=350, gt=0, description="palavras por documento de exemplo no prompt"
+        default=350, gt=0, description="palavras do DOCUMENTO de cada exemplo"
+    )
+    example_max_summary_words: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "palavras do RESUMO de cada exemplo; None mantem integral, que e o "
+            "padrao porque a extensao-alvo e parte do que o few-shot ensina"
+        ),
     )
 
     @model_validator(mode="after")
-    def _check_splits(self) -> DataConfig:
-        if self.eval_split == self.example_split:
+    def _check_sets(self) -> DataConfig:
+        if self.eval_set == self.example_set:
             raise ValueError(
-                "eval_split e example_split iguais causariam vazamento entre "
+                "eval_set e example_set iguais causariam vazamento entre "
                 "avaliacao e base de exemplos"
             )
         return self

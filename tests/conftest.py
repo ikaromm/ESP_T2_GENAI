@@ -102,6 +102,28 @@ def fake_root(tmp_path: Path) -> Path:
     return root
 
 
+@pytest.fixture
+def fake_manifest(fake_root: Path, tmp_path: Path):
+    """Manifesto sobre o FINDSum sintetico: um documento em cada conjunto.
+
+    O pool sintetico tem duas empresas (AAA e BBB) repetidas nos tres splits;
+    como a particao mantem um relatorio por empresa, sobra exatamente um
+    documento para `examples` e um para `eval`.
+    """
+    from findsum_rag.splits import build_manifest
+
+    manifest = build_manifest(
+        fake_root,
+        Task.LIQUIDITY,
+        sizes={"examples": 1, "eval": 1},
+        seed=7,
+        min_summary_words=1,
+    )
+    path = tmp_path / "splits.json"
+    manifest.save(path)
+    return manifest, path
+
+
 class StubEncoder:
     """Codificador deterministico sem modelo, para testar indice e selecao.
 

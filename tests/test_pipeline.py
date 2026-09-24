@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from findsum_rag.config import ExperimentConfig
-from findsum_rag.data import Task, load_documents
+from findsum_rag.data import Task
 from findsum_rag.generate import Generation
 from findsum_rag.metrics import RougeScorer
 from findsum_rag.pipeline import (
@@ -25,6 +25,7 @@ from findsum_rag.pipeline import (
     truncation_report,
 )
 from findsum_rag.prompts import Prompt
+from findsum_rag.splits import load_set
 
 
 class StubSummarizer:
@@ -51,12 +52,16 @@ class StubSummarizer:
 
 
 @pytest.fixture
-def config(fake_root: Path, tmp_path: Path) -> ExperimentConfig:
+def config(fake_root: Path, fake_manifest, tmp_path: Path) -> ExperimentConfig:
+    _, manifest_path = fake_manifest
     cfg = ExperimentConfig(name="teste", output_dir=tmp_path / "outputs")
     cfg.data.root = fake_root
     cfg.data.task = Task.LIQUIDITY
-    cfg.data.n_eval_docs = 2
-    cfg.data.n_example_docs = 2
+    cfg.data.manifest = manifest_path
+    cfg.data.eval_set = "eval"
+    cfg.data.example_set = "examples"
+    cfg.data.n_eval_docs = None
+    cfg.data.n_example_docs = None
     cfg.retrieval.top_k = 2
     cfg.retrieval.chunk_size = 20
     cfg.retrieval.chunk_overlap = 5
@@ -64,8 +69,9 @@ def config(fake_root: Path, tmp_path: Path) -> ExperimentConfig:
 
 
 @pytest.fixture
-def prepared(config: ExperimentConfig, stub_encoder):
-    documents = load_documents(config.data.root, config.data.task, config.data.eval_split)
+def prepared(config: ExperimentConfig, fake_manifest, stub_encoder):
+    manifest, _ = fake_manifest
+    documents = load_set(config.data.root, manifest, config.data.eval_set)
     return prepare_documents(
         documents,
         stub_encoder,
@@ -76,8 +82,21 @@ def prepared(config: ExperimentConfig, stub_encoder):
     )
 
 
+@pytest.fixture
+def store(config: ExperimentConfig, fake_manifest, stub_encoder):
+    manifest, _ = fake_manifest
+    s = build_example_store(
+        config.data.root,
+        manifest,
+        config.data.example_set,
+        max_words=config.data.example_max_words,
+    )
+    s.build_index(stub_encoder, query_words=config.retrieval.query_words)
+    return s
+
+
 def test_prepare_documents_produces_vectors(prepared, stub_encoder):
-    assert len(prepared) == 2
+    assert prepared
     for item in prepared:
         assert item.chunks
         assert item.chunk_vectors.shape == (len(item.chunks), stub_encoder.dimension)
@@ -85,49 +104,63 @@ def test_prepare_documents_produces_vectors(prepared, stub_encoder):
         assert "replace_table_token" not in item.source_text
 
 
-def test_select_context_without_rag_keeps_document_order(prepared, config):
-    arm = config.arm("C1")
-    chunks = select_context(prepared[0], arm, top_k=2)
+def test_full_context_uses_every_chunk(prepared, config):
+    """C1 recebe o documento inteiro, nao um recorte."""
+    item = prepared[0]
+    chunks = select_context(item, config.arm("C1"), top_k=2)
+    assert len(chunks) == len(item.chunks)
+    assert [c.index for c in chunks] == [c.index for c in item.chunks]
+
+
+def test_truncated_context_respects_budget_and_order(prepared, config):
+    """C1t corta nos primeiros top_k, na ordem original."""
+    chunks = select_context(prepared[0], config.arm("C1t"), top_k=2)
+    assert len(chunks) == 2
     assert [c.index for c in chunks] == [0, 1]
 
 
-def test_select_context_with_rag_respects_top_k_and_order(prepared, config):
+def test_retrieved_context_respects_budget_and_reorders(prepared, config):
     chunks = select_context(prepared[0], config.arm("C2"), top_k=2)
     assert len(chunks) == 2
-    # Mesmo escolhidos por similaridade, os trechos voltam em ordem de leitura.
+    # Escolhidos por similaridade, devolvidos em ordem de leitura.
     assert [c.index for c in chunks] == sorted(c.index for c in chunks)
 
 
-def test_rag_and_non_rag_can_differ(prepared, config):
-    plain = select_context(prepared[0], config.arm("C1"), top_k=1)
-    rag = select_context(prepared[0], config.arm("C2"), top_k=1)
-    assert len(plain) == len(rag) == 1
+def test_full_context_is_larger_than_the_limited_modes(prepared, config):
+    item = prepared[0]
+    full = select_context(item, config.arm("C1"), top_k=2)
+    trunc = select_context(item, config.arm("C1t"), top_k=2)
+    rag = select_context(item, config.arm("C2"), top_k=2)
+    assert len(full) > len(trunc) == len(rag) == 2
 
 
-def test_example_store_excludes_empty_summaries(config):
-    store = build_example_store(
-        config.data.root,
-        config.data.task,
-        config.data.example_split,
-        limit=config.data.n_example_docs,
-        max_words=config.data.example_max_words,
-    )
-    assert len(store) == 2
+def test_example_store_excludes_empty_summaries(store):
+    assert len(store) == 1
     assert all(e.summary.strip() for e in store.examples)
     assert all("story_separator_special_tag" not in e.document for e in store.examples)
 
 
-@pytest.mark.parametrize("arm_id", ["C1", "C2", "C3", "C4", "C5"])
-def test_run_arm_end_to_end(arm_id, config, prepared, stub_encoder):
-    store = build_example_store(
-        config.data.root,
-        config.data.task,
-        config.data.example_split,
-        limit=config.data.n_example_docs,
-        max_words=config.data.example_max_words,
-    )
-    store.build_index(stub_encoder, query_words=config.retrieval.query_words)
+def test_example_store_uses_sec_identifiers_from_the_manifest(store, fake_manifest):
+    """Os ids dos exemplos vem do manifesto, nao do fallback por linha."""
+    manifest, _ = fake_manifest
+    expected = {r.doc_id for r in manifest.sets["examples"]}
+    assert {e.doc_id for e in store.examples} == expected
+    # O fallback teria a forma "<task>-<split>-<linha>".
+    assert all("-train-" not in e.doc_id for e in store.examples)
 
+
+def test_example_store_can_truncate_example_summaries(config, fake_manifest):
+    manifest, _ = fake_manifest
+    full = build_example_store(config.data.root, manifest, "examples", max_words=350)
+    cut = build_example_store(
+        config.data.root, manifest, "examples", max_words=350, max_summary_words=3
+    )
+    assert len(cut.examples[0].summary.split()) == 3
+    assert len(full.examples[0].summary.split()) > 3
+
+
+@pytest.mark.parametrize("arm_id", ["C1", "C1t", "C2", "C3", "C4", "C5"])
+def test_run_arm_end_to_end(arm_id, config, prepared, store):
     arm = config.arm(arm_id)
     summarizer = StubSummarizer()
     result = run_arm(
@@ -142,38 +175,27 @@ def test_run_arm_end_to_end(arm_id, config, prepared, stub_encoder):
     assert len(result.scores) == len(prepared)
     assert len(result.predictions) == len(prepared)
     assert result.summary["n_docs"] == float(len(prepared))
-    # Numero de exemplos no prompt coincide com a configuracao.
+    # O seletor nunca devolve mais exemplos do que existem na base: o pool
+    # sintetico tem 1, entao o esperado e min(n_examples, len(store)).
+    expected = min(arm.n_examples, len(store))
     for prompt in summarizer.prompts:
-        assert prompt.n_examples == arm.n_examples
-    # Nenhum documento e exemplo de si mesmo.
+        assert prompt.n_examples == expected
     for row in result.predictions:
         assert row["doc_id"] not in row["example_ids"]
         assert row["arm"] == arm_id
 
 
-def test_fixed_and_dynamic_may_choose_different_examples(config, prepared, stub_encoder):
-    store = build_example_store(
-        config.data.root,
-        config.data.task,
-        config.data.example_split,
-        limit=config.data.n_example_docs,
-        max_words=config.data.example_max_words,
+def test_fixed_examples_are_identical_across_documents(config, prepared, store):
+    result = run_arm(
+        config.arm("C3"),
+        prepared,
+        config=config,
+        summarizer=StubSummarizer(),
+        store=store,
+        rouge=RougeScorer(),
     )
-    store.build_index(stub_encoder, query_words=config.retrieval.query_words)
-
-    picks = {}
-    for arm_id in ("C3", "C5"):
-        result = run_arm(
-            config.arm(arm_id),
-            prepared,
-            config=config,
-            summarizer=StubSummarizer(),
-            store=store,
-            rouge=RougeScorer(),
-        )
-        picks[arm_id] = [tuple(r["example_ids"]) for r in result.predictions]
-    # C3 usa o mesmo exemplo para todos; C5 escolhe por documento.
-    assert len(set(picks["C3"])) == 1
+    picks = {tuple(r["example_ids"]) for r in result.predictions}
+    assert len(picks) == 1
 
 
 def test_truncation_report_is_silent_when_nothing_truncated(config, prepared):

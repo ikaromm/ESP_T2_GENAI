@@ -4,11 +4,13 @@ seed: 42
 data:
   root: data/raw/findsum
   task: liquidity
-  eval_split: val
-  example_split: train
-  n_eval_docs: 100
-  n_example_docs: 500
+  manifest: data/interim/splits-liquidity.json
+  eval_set: dev
+  example_set: examples
+  n_eval_docs: 50
+  n_example_docs: null
   example_max_words: 350
+  example_max_summary_words: null
 retrieval:
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
   chunk_size: 220
@@ -17,37 +19,42 @@ retrieval:
   query_words: 400
   include_tables: true
 generation:
-  model_name: Qwen/Qwen2.5-7B-Instruct
+  model_name: Qwen/Qwen3.5-9B
   load_in_4bit: true
   max_new_tokens: 1536
   temperature: 0.0
   top_p: 1.0
   seed: 42
-  max_input_tokens: 12288
+  max_input_tokens: 16384
   dtype: bfloat16
 arms:
 - id: C1
-  label: Baseline (sem RAG, sem few-shot)
-  use_rag: false
+  label: Baseline (documento inteiro, sem few-shot)
+  context_mode: full
+  example_strategy: none
+  n_examples: 0
+- id: C1t
+  label: Controle (truncado no orcamento do RAG, sem few-shot)
+  context_mode: truncated
   example_strategy: none
   n_examples: 0
 - id: C2
   label: RAG
-  use_rag: true
+  context_mode: retrieved
   example_strategy: none
   n_examples: 0
 - id: C3
   label: RAG + few-shot fixo
-  use_rag: true
+  context_mode: retrieved
   example_strategy: fixed
-  n_examples: 2
+  n_examples: 4
 - id: C4
   label: RAG + few-shot aleatorio
-  use_rag: true
+  context_mode: retrieved
   example_strategy: random
-  n_examples: 2
+  n_examples: 4
 - id: C5
   label: RAG + few-shot dinamico
-  use_rag: true
+  context_mode: retrieved
   example_strategy: dynamic
-  n_examples: 2
+  n_examples: 4

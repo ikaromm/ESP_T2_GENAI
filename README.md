@@ -14,20 +14,48 @@ preservação de informações numéricas de resumos de relatórios financeiros
 longos, comparada a abordagens sem RAG e a estratégias convencionais de seleção
 de exemplos?
 
-## As cinco configurações
+## As configurações
 
-| id | RAG | exemplos few-shot |
-|----|-----|-------------------|
-| C1 | não | nenhum (baseline) |
-| C2 | sim | nenhum |
-| C3 | sim | fixos |
-| C4 | sim | aleatórios |
-| C5 | sim | **dinâmicos por similaridade semântica** ← a proposta |
+| id | contexto do documento | exemplos few-shot |
+|----|----|----|
+| C1 | **documento inteiro** | nenhum |
+| C1t | truncado no orçamento de C2 | nenhum |
+| C2 | recuperado (`top_k` trechos) | nenhum |
+| C3 | recuperado | 4 fixos |
+| C4 | recuperado | 4 aleatórios |
+| C5 | recuperado | **4 dinâmicos por similaridade semântica** ← a proposta |
 
 O que muda entre elas é apenas o contexto e os exemplos. Modelo, instrução,
 estrutura do prompt, parâmetros de geração e conjunto avaliado são idênticos —
 sem isso, uma diferença de desempenho poderia vir da redação do prompt em vez da
 técnica investigada.
+
+C1 recebe o **documento inteiro** porque ele cabe: são ~7,3 mil tokens contra uma
+janela de 262 mil. Truncar o baseline seria construir uma escassez de contexto
+que não existe. Isso muda o que a hipótese do RAG afirma — deixa de ser "a
+recuperação dá mais informação ao modelo" e passa a ser **"um recorte curado
+supera o documento inteiro"**, testável pela degradação conhecida de atenção em
+contexto longo.
+
+C1t existe para separar os dois efeitos. Com o mesmo orçamento de C2 mas cortando
+em vez de recuperar, ele isola quanto do resultado vem de *recuperar* e quanto
+vem apenas de *reduzir* o contexto.
+
+### A cadeia de ablação
+
+Cada par adjacente muda exatamente um fator:
+
+| | comparação | fator isolado |
+|---|---|---|
+| H1 | C1 → C2 | recorte curado vs documento inteiro |
+| H1b | C1t → C2 | recuperar vs truncar, mesmo orçamento |
+| H2 | C2 → C3 | presença de exemplos |
+| H3 | C3 → C4 | identidade dos exemplos (controle) |
+| H4 | C4 → C5 | **relevância semântica dos exemplos** |
+
+H3 parece inútil e é o controle mais importante: se C3 ≈ C4, o que importa é ter
+exemplos, não quais — e aí o ganho de C5 isola limpo o efeito da seleção
+semântica. H4 é a hipótese central da pesquisa.
 
 ## Instalação
 
@@ -61,11 +89,44 @@ silêncio:
    extrato, não o 10-K integral. Isso limita o que a expressão "documentos
    longos" pode afirmar no TCC.
 
+## Os conjuntos experimentais
+
+Aqui **nada é treinado** — nenhum peso é atualizado. Os splits `train`/`val`/`test`
+do FINDSum foram feitos para treinar modelos seq2seq e não servem a este estudo.
+Os três splits são fundidos num pool único (20.672 documentos, 3.742 empresas) e
+reparticionados em:
+
+| conjunto | tamanho | para que serve | quantas vezes se olha |
+|---|---|---|---|
+| `examples` | 1.000 | demonstrações few-shot de C3–C5 | nunca é pontuado |
+| `dev` | 500 | ajustar prompt, `top_k`, nº de exemplos | quantas vezes quiser |
+| `eval` | 1.000 | o número que vai no trabalho | **uma vez, no fim** |
+
+```bash
+uv run python scripts/build_splits.py     # grava data/interim/splits-liquidity.json
+uv run findsum splits                     # inspeciona a partição
+```
+
+Duas invariantes, ambas exigidas pelo desenho e validadas na carga do manifesto:
+
+1. **Uma empresa em um único conjunto, com um único relatório** (o mais recente).
+   Sem isso um exemplo few-shot poderia ser outro exercício da mesma empresa
+   avaliada, e o ganho de C5 viria de quase-duplicação em vez de relevância
+   semântica.
+2. **A partição é congelada em disco.** Ampliar a avaliação depois de olhar
+   resultados só não é cherry-picking se o conjunto já estava definido antes. O
+   script se recusa a sobrescrever um manifesto existente sem `--force`.
+
+O preço é perder comparabilidade com resultados publicados sobre o split oficial
+do FINDSum. Como o estudo compara as configurações entre si, é um preço baixo —
+mas precisa constar na redação.
+
 ## Uso
 
 ```bash
 uv run findsum arms                       # lista as configurações
-uv run findsum inspect --split val        # valida a carga dos dados
+uv run findsum splits                     # inspeciona a partição
+uv run findsum inspect --split val        # valida a carga dos dados brutos
 uv run findsum init-config                # gera configs/experiment.yaml
 uv run findsum run --config configs/experiment.yaml
 uv run findsum run --config configs/experiment.yaml --arm C1 --arm C5
@@ -97,54 +158,38 @@ supera a outra configuração, descontados os empates.
 
 ## Métricas
 
-Três dimensões, conforme o projeto de pesquisa:
+A análise principal compara **previsão × resumo de referência**:
 
 | dimensão | métricas |
 |---|---|
 | qualidade textual | ROUGE-1/2/L, BERTScore |
-| preservação numérica | precisão / cobertura / F1 dos números contra a referência |
-| fidelidade factual | ancoragem numérica contra o **documento** |
-| (controle) extratividade | sobreposição de n-gramas com o documento |
-
-A separação entre preservação e fidelidade é deliberada. Comparar com a
-referência mede se o resumo **cobre** o que deveria; comparar com o documento
-mede se o resumo **inventa**. Um número ausente da fonte é alucinação mesmo que
-apareça na referência, e um resumo pode ir bem numa dimensão e mal na outra.
+| preservação numérica | precisão / cobertura / F1 dos números |
 
 A extração numérica normaliza escalas textuais, então `$ 50.0 million` e
-`50,000,000` contam como o mesmo valor. `numeric_grounding` vale 1.0 para
-resumos sem números — interprete sempre junto de `numeric_recall`, que é quem
-penaliza o resumo que simplesmente evita citar valores.
+`50,000,000` contam como o mesmo valor.
 
-### As métricas de ancoragem precisam de calibração
+Como diagnóstico secundário, e sem custo de GPU, também são gravadas duas
+métricas contra o **documento**: `numeric_grounding` e `ngram_grounding`. Elas
+existem porque comparar apenas com a referência pune igualmente um número
+inventado e um número que está no relatório mas que o resumidor humano não
+selecionou. Se em algum momento for preciso separar os dois casos, o dado já está
+em `scores.csv`.
 
-Medido nos dados reais (Liquidity/val), o **próprio resumo de referência** marca:
-
-| métrica | valor da referência |
-|---|---|
-| `numeric_grounding` | ~0,56 |
-| `ngram_grounding` | ~0,12 |
-
-Duas consequências, ambas contraintuitivas:
-
-1. **~44% dos números do resumo humano não estão no texto distribuído.** É efeito
-   da seleção de conteúdo do FINDSum (ver `docs/dataset.md`). Isso impõe um teto
-   prático: nenhum modelo que use apenas esse texto deveria ser cobrado de
-   superar ~0,56. Comparar contra 1,0 produziria a conclusão falsa de que todas
-   as configurações alucinam massivamente.
-2. **`ngram_grounding` mede extratividade, não fidelidade.** Os resumos do
-   FINDSum são abstrativos. Um modelo com 0,9 aqui estaria colando trechos — pior,
-   não melhor. O que interessa é a proximidade ao patamar da referência.
-
-Toda rodada grava `reference_baseline.json` com esses valores, para que os
-resultados sejam lidos na escala certa.
+Para interpretá-las é obrigatório olhar `reference_baseline.json`: medido nos
+dados reais, o **próprio resumo de referência** marca `numeric_grounding` ~0,56 e
+`ngram_grounding` ~0,12 contra o texto distribuído. Ou seja, ~44% dos números do
+resumo humano não estão na fonte (efeito da seleção de conteúdo do FINDSum, ver
+`docs/dataset.md`), e as referências são abstrativas — um modelo com 0,9 de
+`ngram_grounding` estaria colando trechos, o que é pior e não melhor.
 
 ## Estrutura
 
 ```
 scripts/fetch_findsum.py   download do Google Drive com retomada
+scripts/build_splits.py    partição congelada dos conjuntos experimentais
 src/findsum_rag/
   data.py        carga e remontagem dos segmentos, tabelas
+  splits.py      partição por empresa, manifesto congelado
   chunking.py    fatiamento em trechos recuperáveis
   retrieval.py   embeddings + índice FAISS (cosseno exato)
   examples.py    as quatro estratégias de seleção de exemplos
@@ -158,10 +203,16 @@ src/findsum_rag/
 docs/dataset.md  formato do FINDSum, verificado empiricamente
 ```
 
-Duas bases vetoriais distintas, que não devem ser confundidas: a de **contexto**
-(trechos do próprio documento a resumir, usada pelo RAG) e a de **exemplos**
-(pares documento-resumo de outros documentos, sempre do split de treino, usada
-pelo few-shot). Nenhum documento é exemplo de si mesmo.
+Duas recuperações distintas, que não devem ser confundidas:
+
+1. **contexto** — o índice são os trechos do *próprio documento* a resumir. Não
+   pode ser uma base separada: recuperar de outros relatórios faria o modelo
+   citar números de outra empresa no resumo.
+2. **exemplos** — o índice são os 1.000 documentos do conjunto `examples`, com
+   seus resumos. É desta base que saem as demonstrações de C5.
+
+Nenhum documento é exemplo de si mesmo, e nenhuma empresa aparece em dois
+conjuntos.
 
 ## Testes
 
@@ -177,21 +228,33 @@ eles não estiverem presentes — é lá que ficam travadas as suposições sobr
 formato do dataset. Os testes marcados `slow` carregam uma LLM minúscula para
 exercitar a API do transformers de verdade.
 
-## Hardware de referência
+## Hardware de referência e custo medido
 
-RTX 4070 (12 GB), onde um modelo de 7B em bf16 não cabe. O padrão é quantização
-NF4 em 4 bits (~5 GB), deixando folga para o cache de atenção dos prompts de
-~12k tokens deste estudo.
+RTX 4070 (12 GB). O padrão é quantização NF4 em 4 bits. Medições reais com
+prompts deste estudo:
+
+| configuração | prompt | taxa | por documento (1.374 tokens de saída) |
+|---|---|---|---|
+| C1 / C1t / C2 (0 exemplos) | ~3,2 mil tok | 38,6 tok/s | ~36 s |
+| C3 / C4 / C5 (4 exemplos) | ~10,3 mil tok | 28,7 tok/s | ~48 s |
+
+Pico de VRAM: 7,9 GB dos 12,3. Uma passada das 6 configurações custa ~4,3 min por
+documento, logo **~6 h nos 50 do dev** e **~71 h nos 1.000 da avaliação**.
+
+Por isso o `dev` de 500 não é o loop de iteração: a 30 h por passada, três
+iterações custariam mais que a avaliação final inteira. Itere em 50
+(`n_eval_docs: 50`, o padrão) e use os 500 uma única vez, para confirmar a
+configuração antes de abrir a avaliação.
 
 ## Pendências
 
-- [ ] Escolher e justificar a LLM de pesos abertos (o default é
-      `Qwen/Qwen2.5-7B-Instruct`, ainda não comparado com alternativas)
-- [ ] Rodada completa das cinco configurações e testes estatísticos entre elas
+- [ ] Calibrar `top_k` no dev de 50 (padrão atual: 12, ou ~31% dos trechos)
+- [ ] Pré-teste comparativo do modelo, se desejado (o padrão é `Qwen/Qwen3.5-9B`,
+      medido e cabendo na GPU, mas não comparado com Llama-3.1-8B / Mistral-7B)
+- [ ] Verificar a dispersão de C3 com 3 conjuntos fixos distintos no dev
+- [ ] Rodada completa das 6 configurações e testes estatísticos
 - [ ] Análise de erros por documento e por tipo de informação
-- [ ] Teste de generalização em documentos fora do desenvolvimento
-- [ ] Decidir entre o extrato do FINDSum e a coleta dos 10-Ks na EDGAR
-      (ver `docs/dataset.md`)
+- [ ] Teste de generalização no conjunto `eval`, aberto uma única vez
 
 ## Citação do dataset
 

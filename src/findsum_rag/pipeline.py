@@ -23,7 +23,7 @@ import numpy as np
 
 from .chunking import Chunk, chunk_document
 from .config import ExperimentArm, ExperimentConfig
-from .data import Document, Task, clean_text, load_documents
+from .data import Document, clean_text
 from .examples import Example, ExampleStore, make_selector
 from .generate import Generation, Summarizer
 from .metrics import (
@@ -36,6 +36,7 @@ from .metrics import (
 )
 from .prompts import build_prompt
 from .retrieval import Encoder, SentenceTransformerEncoder, VectorIndex
+from .splits import SplitManifest, load_set
 
 
 @dataclass
@@ -94,58 +95,72 @@ def prepare_documents(
 def select_context(prepared: PreparedDocument, arm: ExperimentArm, top_k: int) -> list[Chunk]:
     """Escolhe os trechos que entram no prompt.
 
-    Com RAG, recupera os `top_k` trechos mais similares ao documento inteiro.
-    Sem RAG (C1), usa os `top_k` primeiros trechos na ordem original -- o
-    equivalente a truncar o documento, que e a alternativa realista quando ele
-    nao cabe no contexto do modelo.
+    Tres modos, e a diferenca entre eles e o fator experimental:
+
+    * `full`      -- o documento inteiro. Possivel porque ele cabe na janela
+      (~7,3 mil tokens contra 262 mil), logo e o baseline realista.
+    * `retrieved` -- os `top_k` trechos mais similares ao documento (RAG).
+    * `truncated` -- os `top_k` primeiros trechos na ordem original. Mesmo
+      orcamento de `retrieved`, sem recuperacao: isola quanto do efeito vem de
+      recuperar e quanto vem so de reduzir o contexto.
+
+    Nos dois modos limitados os trechos voltam em ordem de leitura do relatorio,
+    nao por score: a sequencia carrega informacao (fluxo narrativo, ordem
+    temporal) que a ordenacao por similaridade destruiria.
     """
-    if not arm.use_rag:
+    if arm.uses_full_document:
+        return list(prepared.chunks)
+
+    if arm.context_mode == "truncated":
         return prepared.chunks[:top_k]
 
     index = VectorIndex(int(prepared.chunk_vectors.shape[1]))
     index.add(prepared.chunk_vectors, list(prepared.chunks))
     hits = index.search(prepared.query_vector, top_k)
     chosen: list[Chunk] = [h.payload for h in hits]  # type: ignore[misc]
-    # Reordena pela posicao original: a ordem de leitura do relatorio carrega
-    # informacao (fluxo narrativo, sequencia temporal) que a ordem por score nao.
     chosen.sort(key=lambda c: c.index)
     return chosen
 
 
 def build_example_store(
     root: Path | str,
-    task: Task,
-    split: str,
+    manifest: SplitManifest,
+    name: str,
     *,
-    limit: int,
-    max_words: int,
-    with_tables: bool = False,
+    limit: int | None = None,
+    max_words: int = 350,
+    max_summary_words: int | None = None,
 ) -> ExampleStore:
-    """Monta a base de exemplos few-shot a partir de um split de treino.
+    """Monta a base de exemplos few-shot a partir de um conjunto do manifesto.
 
-    `with_tables=False` por padrao: o arquivo de tuplas do split de treino tem
-    ~2 GB e so serve para derivar `stock_name`/`report_id`. Sem ele os `doc_id`
-    dos exemplos caem no formato `<task>-<split>-<linha>`, o que basta porque a
-    configuracao ja proibe usar o mesmo split para avaliacao e exemplos. Ligue-o
-    quando quiser que a exclusao por `doc_id` seja efetiva -- por exemplo ao
-    avaliar sobre o proprio split de treino.
+    `with_tables=False` na carga: o arquivo de tuplas do split de treino tem
+    ~2 GB e aqui so interessam texto e resumo -- os `doc_id` vem do manifesto.
 
-    Atencao ao desenho experimental: uma mesma empresa pode ter relatorios de
-    anos diferentes em splits diferentes. Nao e o mesmo documento, mas a selecao
-    dinamica tende a puxar justamente a outra declaracao da mesma empresa. Se
-    isso conta como vantagem legitima do metodo ou como confundidor e uma decisao
-    a declarar na redacao, nao algo que este codigo decide.
+    `max_summary_words=None` (padrao) mantem o resumo integral. A extensao-alvo
+    e parte do que a demonstracao ensina: truncar o resumo do exemplo ensinaria o
+    modelo a parar cedo. O custo e de contexto, nao de fidelidade.
+
+    O `doc_id` vem do MANIFESTO, nao do documento carregado: sem as tabelas o
+    `Document` nao tem `stock_name`/`report_id` e cairia num id sintetico por
+    linha. Usar o id real mantem a exclusao do proprio documento efetiva e torna
+    os `example_ids` gravados em `predictions.jsonl` rastreaveis.
     """
-    documents = load_documents(root, task, split, limit=limit, with_tables=with_tables)
-    examples = [
-        Example(
-            doc_id=d.doc_id,
-            document=" ".join(clean_text(d.document).split()[:max_words]),
-            summary=clean_text(d.summary),
+    refs = manifest.sets[name][:limit] if limit is not None else manifest.sets[name]
+    documents = load_set(root, manifest, name, limit=limit, with_tables=False)
+    examples: list[Example] = []
+    for ref, document in zip(refs, documents, strict=True):
+        summary = clean_text(document.summary)
+        if not summary:
+            continue
+        if max_summary_words:
+            summary = " ".join(summary.split()[:max_summary_words])
+        examples.append(
+            Example(
+                doc_id=ref.doc_id,
+                document=" ".join(clean_text(document.document).split()[:max_words]),
+                summary=summary,
+            )
         )
-        for d in documents
-        if d.summary.strip()
-    ]
     return ExampleStore(examples)
 
 
@@ -255,10 +270,17 @@ def run_experiment(
 
     encoder = SentenceTransformerEncoder(config.retrieval.embedding_model)
 
-    documents = load_documents(
+    manifest = SplitManifest.load(config.data.manifest)
+    if manifest.task != config.data.task:
+        raise ValueError(
+            f"o manifesto e da tarefa {manifest.task.value}, mas a configuracao "
+            f"pede {config.data.task.value}"
+        )
+
+    documents = load_set(
         config.data.root,
-        config.data.task,
-        config.data.eval_split,
+        manifest,
+        config.data.eval_set,
         limit=config.data.n_eval_docs,
     )
     prepared = prepare_documents(
@@ -276,10 +298,11 @@ def run_experiment(
     if needs_examples:
         store = build_example_store(
             config.data.root,
-            config.data.task,
-            config.data.example_split,
+            manifest,
+            config.data.example_set,
             limit=config.data.n_example_docs,
             max_words=config.data.example_max_words,
+            max_summary_words=config.data.example_max_summary_words,
         )
         if any(a.example_strategy == "dynamic" for a in selected):
             store.build_index(encoder, query_words=config.retrieval.query_words)

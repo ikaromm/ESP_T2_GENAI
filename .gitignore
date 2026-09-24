@@ -1,6 +1,15 @@
-# dados (FINDSum tem ~6.4 GB; baixe com scripts/fetch_findsum.py)
-data/
-!data/.gitkeep
+# dados (FINDSum tem ~6.5 GB; baixe com scripts/fetch_findsum.py)
+# `data/*` em vez de `data/` porque o git nao desce num diretorio ignorado:
+# sem isso as excecoes abaixo nao teriam efeito.
+data/*
+
+# EXCECAO: os manifestos de particao SAO versionados de proposito. Eles congelam
+# quais documentos vao para exemplos, dev e avaliacao. Sem estar no git a
+# particao nao e reproduzivel e a avaliacao final perde a garantia de que o
+# conjunto foi definido antes de olhar resultados. Sao ~450 KB de texto.
+!data/interim/
+data/interim/*
+!data/interim/splits-*.json
 
 # artefatos de experimento
 outputs/

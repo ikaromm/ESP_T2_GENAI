@@ -58,7 +58,13 @@ class Summarizer:
         self._model = None
 
     def load(self) -> None:
-        """Carrega tokenizer e modelo. Idempotente."""
+        """Carrega tokenizer e modelo. Idempotente.
+
+        Alguns checkpoints recentes (Qwen3.5, por exemplo) sao multimodais e
+        declaram `*ForConditionalGeneration`. Aqui o uso e so de texto, por isso
+        tenta-se primeiro a classe causal -- que carrega apenas a torre de texto
+        e economiza VRAM -- com recuo para a classe declarada no checkpoint.
+        """
         if self._model is not None:
             return
 
@@ -83,7 +89,18 @@ class Summarizer:
                 bnb_4bit_use_double_quant=True,
             )
 
-        self._model = AutoModelForCausalLM.from_pretrained(cfg.model_name, **kwargs)
+        try:
+            self._model = AutoModelForCausalLM.from_pretrained(cfg.model_name, **kwargs)
+        except (ValueError, KeyError, OSError) as exc:
+            from transformers import AutoModel
+
+            print(
+                f"AutoModelForCausalLM falhou para {cfg.model_name} ({exc}); "
+                "recorrendo a AutoModel",
+                flush=True,
+            )
+            self._model = AutoModel.from_pretrained(cfg.model_name, **kwargs)
+
         self._model.eval()
 
     @property

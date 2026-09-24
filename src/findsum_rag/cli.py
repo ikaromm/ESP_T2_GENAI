@@ -56,13 +56,49 @@ def init_config(
 
 
 @app.command()
+def splits(
+    manifest: Path = typer.Option(
+        Path("data/interim/splits-liquidity.json"), help="manifesto de particao"
+    ),
+    root: Path = typer.Option(Path("data/raw/findsum"), help="raiz dos dados brutos"),
+    check: bool = typer.Option(False, "--check", help="carrega os documentos e valida"),
+) -> None:
+    """Mostra a particao congelada dos conjuntos experimentais."""
+    from .splits import SplitManifest, load_set
+
+    m = SplitManifest.load(manifest)
+    typer.echo(f"tarefa: {m.task.value} | semente: {m.seed} | criado: {m.created_at}")
+    typer.echo(f"piso de palavras no resumo: {m.min_summary_words}\n")
+
+    for name, refs in m.sets.items():
+        years = [r.year for r in refs if r.year]
+        faixa = f"{min(years)}-{max(years)}" if years else "-"
+        typer.echo(
+            f"{name:<10} {len(refs):>5} documentos  "
+            f"{len({r.stock_name for r in refs}):>5} empresas  anos {faixa}"
+        )
+
+    total = sum(len(r) for r in m.sets.values())
+    companies = {r.stock_name for refs in m.sets.values() for r in refs}
+    typer.echo(f"\ntotal: {total} documentos, {len(companies)} empresas distintas")
+    if len(companies) != total:
+        typer.echo("ATENCAO: ha empresa repetida entre conjuntos")
+        raise typer.Exit(code=1)
+    typer.echo("uma empresa por conjunto, um relatorio por empresa: OK")
+
+    if check:
+        for name in m.sets:
+            documents = load_set(root, m, name, limit=5, with_tables=False)
+            typer.echo(f"  {name}: carregou {len(documents)} documentos de amostra")
+
+
+@app.command()
 def arms() -> None:
     """Lista as configuracoes experimentais padrao."""
     for arm in DEFAULT_ARMS:
-        rag = "sim" if arm.use_rag else "nao"
         typer.echo(
-            f"{arm.id}  rag={rag:<4} exemplos={arm.example_strategy:<8} "
-            f"n={arm.n_examples}  {arm.label}"
+            f"{arm.id:<4} contexto={arm.context_mode:<10} "
+            f"exemplos={arm.example_strategy:<8} n={arm.n_examples}  {arm.label}"
         )
 
 
