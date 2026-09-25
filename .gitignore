@@ -12,8 +12,15 @@ data/interim/*
 !data/interim/splits-*.json
 
 # artefatos de experimento
+# `outputs/` e o completo, com predictions.jsonl: cresce com o numero de
+# documentos (~100 MB em 1.000) e fica fora do git.
 outputs/
 runs/
+# `dist/` sao os tarballs para download via scp.
+dist/
+# ATENCAO: `results/` NAO entra aqui de proposito. E a versao leve (~50 KB por
+# rodada: metricas agregadas, scores por documento e tabela estatistica) e o
+# lugar onde os resultados do trabalho ficam versionados. Ver deploy.sh.
 *.faiss
 *.index
 models/

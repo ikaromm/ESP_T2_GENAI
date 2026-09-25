@@ -1,0 +1,21 @@
+# O dataset (6,5 GB) e os resultados sao volumes, nao conteudo de imagem.
+data/
+outputs/
+results/
+dist/
+
+.venv/
+.git/
+.gitignore
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+htmlcov/
+
+.idea/
+.vscode/
+*.swp
+.DS_Store

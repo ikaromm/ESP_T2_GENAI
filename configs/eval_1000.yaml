@@ -1,0 +1,73 @@
+# Perfil eval_1000: AVALIACAO FINAL. Abra uma unica vez.
+#
+# Roda sobre os 1.000 documentos do conjunto `eval`, que nenhum outro perfil
+# toca. Custo medido: ~71 h nas 6 configuracoes.
+#
+# Rode este perfil SOMENTE depois de congelar prompt e parametros no test_50.
+# Rodar, ajustar e rodar de novo transforma o conjunto de avaliacao em conjunto
+# de desenvolvimento, e o numero reportado deixa de valer.
+name: eval_1000
+output_dir: outputs
+seed: 42
+
+data:
+  root: data/raw/findsum
+  task: liquidity
+  manifest: data/interim/splits-liquidity.json
+  eval_set: eval
+  example_set: examples
+  n_eval_docs: null
+  n_example_docs: null
+  example_max_words: 350
+  example_max_summary_words: null
+
+retrieval:
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  chunk_size: 220
+  chunk_overlap: 40
+  # Use o valor calibrado no test_50.
+  top_k: 12
+  query_words: 400
+  include_tables: true
+
+generation:
+  model_name: Qwen/Qwen3.5-9B
+  load_in_4bit: true
+  max_new_tokens: 1536
+  temperature: 0.0
+  top_p: 1.0
+  seed: 42
+  max_input_tokens: 16384
+  dtype: bfloat16
+
+arms:
+  - id: C1
+    label: Baseline (documento inteiro, sem few-shot)
+    context_mode: full
+    example_strategy: none
+    n_examples: 0
+  - id: C1t
+    label: Controle (truncado no orcamento do RAG, sem few-shot)
+    context_mode: truncated
+    example_strategy: none
+    n_examples: 0
+  - id: C2
+    label: RAG
+    context_mode: retrieved
+    example_strategy: none
+    n_examples: 0
+  - id: C3
+    label: RAG + few-shot fixo
+    context_mode: retrieved
+    example_strategy: fixed
+    n_examples: 4
+  - id: C4
+    label: RAG + few-shot aleatorio
+    context_mode: retrieved
+    example_strategy: random
+    n_examples: 4
+  - id: C5
+    label: RAG + few-shot dinamico
+    context_mode: retrieved
+    example_strategy: dynamic
+    n_examples: 4

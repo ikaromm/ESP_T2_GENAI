@@ -156,6 +156,66 @@ correção infla o erro tipo I.
 O tamanho de efeito reportado é a proporção de documentos em que a referência
 supera a outra configuração, descontados os empates.
 
+## Executar num servidor remoto (Docker)
+
+`deploy.sh` empacota tudo em container. A imagem não contém dados nem pesos de
+modelo: o FINDSum (6,5 GB) e o modelo (~6 GB) são volumes, para que a imagem
+continue reproduzível e alterar um `.py` não invalide a camada de 3 GB do torch.
+
+```bash
+git clone git@github.com:ikaromm/ESP_T2_GENAI.git && cd ESP_T2_GENAI
+./deploy.sh doctor        # confere docker, GPU, dados, disco
+./deploy.sh data          # baixa o FINDSum e gera a partição (uma vez)
+./deploy.sh test_50       # roda o perfil configs/test_50.yaml (~6 h)
+```
+
+Perfis disponíveis são os arquivos em `configs/`. `./deploy.sh <perfil>` equivale
+a `./deploy.sh run <perfil>`.
+
+| perfil | conjunto | documentos | custo estimado |
+|---|---|---|---|
+| `test_50` | `dev` | 50 | ~6 h |
+| `eval_1000` | `eval` | 1.000 | ~71 h |
+
+### Onde fica a saída
+
+Três destinos, e a diferença entre eles é deliberada:
+
+| destino | conteúdo | tamanho | no git? |
+|---|---|---|---|
+| `results/<perfil>/` | métricas agregadas, `scores.csv` por documento, tabela estatística | ~50 KB | **sim** |
+| `outputs/<perfil>/` | tudo, incluindo `predictions.jsonl` com cada resumo gerado | ~5 MB (50 docs) | não |
+| `dist/<perfil>.tar.gz` | `outputs/` comprimido, para baixar | | não |
+
+Para publicar os resultados:
+
+```bash
+git add results/test_50 && git commit -m "resultados: test_50" && git push
+```
+
+Para trazer tudo para a máquina local:
+
+```bash
+scp <servidor>:~/ESP_T2_GENAI/dist/test_50.tar.gz . && tar -xzf test_50.tar.gz
+```
+
+`predictions.jsonl` fica fora do git porque cresce com o número de documentos
+(~100 MB em 1.000), mas é o arquivo que importa para análise de erros — cada
+linha traz o resumo gerado, a referência, os exemplos usados no prompt e as
+contagens de token. É por isso que existe o tarball.
+
+### Pré-requisitos no servidor
+
+GPU com ~12 GB, driver NVIDIA e **nvidia-container-toolkit**. `./deploy.sh doctor`
+verifica e imprime as instruções de instalação se faltar. A geração exige GPU —
+em CPU cada documento levaria horas em vez de ~45 s.
+
+Se seu usuário não estiver no grupo `docker`, use `FINDSUM_DOCKER="sudo docker"
+./deploy.sh ...` em vez de entrar no grupo (o grupo `docker` equivale a acesso
+root na máquina).
+
+Espaço em disco: ~7 GB de dataset, ~7 GB de imagem, ~6 GB de pesos.
+
 ## Métricas
 
 A análise principal compara **previsão × resumo de referência**:
@@ -185,6 +245,10 @@ resumo humano não estão na fonte (efeito da seleção de conteúdo do FINDSum,
 ## Estrutura
 
 ```
+deploy.sh                  execução em container, num servidor remoto
+Dockerfile                 imagem sem dados nem pesos (ambos são volumes)
+configs/test_50.yaml        perfil de iteração (50 documentos do dev)
+configs/eval_1000.yaml      perfil de avaliação final (1.000 do eval)
 scripts/fetch_findsum.py   download do Google Drive com retomada
 scripts/build_splits.py    partição congelada dos conjuntos experimentais
 src/findsum_rag/
