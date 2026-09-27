@@ -6,7 +6,7 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 
 ![Acompanhamento FINDSum](results/progress/dashboard.png)
 
-**Primeiros 100 documentos concluídos nos três modelos: 1.800 respostas.** C1 teve as maiores médias de BERTScore F1, ROUGE-L e METEOR; C2 superou o prefixo C1t, mas ficou abaixo da fonte inteira. São resultados parciais descritivos, sem confirmação de hipóteses.
+**160 documentos concluídos nos três modelos: 2.880 respostas.** C1 teve as maiores médias de BERTScore F1, ROUGE-L e METEOR; C2 superou o prefixo C1t, mas ficou abaixo da fonte inteira. São resultados parciais descritivos, sem confirmação de hipóteses.
 
 - [Painel atual, tabela e evolução cumulativa](results/progress/README.md)
 - [Interpretação dos primeiros 100 documentos](docs/metricas-primeiros100-20260927.md)
@@ -26,7 +26,7 @@ bash rodar_rodada.sh --metrics-only # atualiza apenas métricas e painel, sem AP
 
 A preparação integral já existe neste workspace em `outputs/full-{ling,qwen,gemma}-prepared`. Uma nova instalação precisa do dataset, dos modelos locais e desses artefatos preparados; eles não estão no Git. O caminho da credencial é `../.env`, variável `OPEN_ROUTER_KEY`. Nunca adicione esse arquivo ao repositório.
 
-Cada grupo de 100 documentos tem **600 gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 100 estão concluídos; a próxima rodada começa nos documentos 101–200 da ordem congelada.
+Cada grupo de 100 documentos tem **600 gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 160 estão concluídos; a próxima rodada começa no documento 161 da ordem congelada.
 
 A execução normal envia chamadas pagas de Qwen/Gemma. `--dry-run`, `--metrics-only` e `--audit-ling-batch 1` são modos locais. Não apague `outputs/full-rounds/active-round.json`, os ledgers ou as pastas de respostas para tentar avançar.
 
