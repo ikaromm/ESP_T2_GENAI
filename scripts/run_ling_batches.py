@@ -6,6 +6,9 @@ import argparse
 import fcntl
 import hashlib
 import json
+from contextlib import contextmanager
+from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 from findsum_rag.config import ExperimentConfig
@@ -87,6 +90,151 @@ def export_progress(output, rows, records, accepted):
     return report
 
 
+@dataclass
+class PreparedRun:
+    model: str
+    prepared: Path
+    output: Path
+    records: list
+    rows: list
+    cfg: ExperimentConfig
+    identity: dict
+    budget: Decimal
+
+    @property
+    def folder(self):
+        return self.output / self.model
+
+    def accepted(self):
+        return accepted_cases(self.folder, self.rows, self.identity, self.model)
+
+
+@contextmanager
+def output_lock(output):
+    output.mkdir(parents=True, exist_ok=True)
+    with (output / ".batches.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("outra execucao usa estes lotes") from None
+        yield
+
+
+def load_model(model, prepared=None, output=None, budget=None):
+    slug = {"ling-free": "ling", "qwen37": "qwen", "gemma26": "gemma"}[model]
+    prepared = prepared or Path(f"outputs/full-{slug}-prepared")
+    output = output or Path(f"outputs/full-{slug}-batches")
+    with activity(f"{model}: conferindo congelamento"):
+        frozen = verify_full_lock(prepared=prepared)
+    split, records = selected_records(prepared)
+    if split != "eval":
+        raise ValueError("lotes exclusivos da coorte final")
+    cfg = ExperimentConfig.from_yaml(prepared / "config.yaml")
+    plan = json.loads(Path("configs/openrouter_full.json").read_text())
+    target = plan["models"][model]
+    if TARGETS[model][:2] != (target["model"], target["provider"]):
+        raise ValueError("endpoint difere do congelado")
+    ceiling = money(0 if model == "ling-free" else frozen["budgets_usd"][f"{slug}_generation"])
+    budget = ceiling if budget is None else money(budget)
+    if budget > ceiling:
+        raise ValueError("orcamento excede teto congelado do modelo")
+    with activity(f"{model}: validando integridade e tokens dos 6000 prompts"):
+        rows = load_prepared(prepared, model, 1000)
+    limits = Limits(
+        cfg.generation.max_input_tokens, cfg.generation.max_new_tokens, target["context_length"]
+    )
+    for row in rows:
+        limits.check(row["prompt_tokens"])
+        if row["max_output_tokens"] != limits.max_output or not row.get("allow_length"):
+            raise ValueError("politica de saida difere do congelado")
+    batch_indices(records, rows)
+    identity = {
+        "full_lock_id": json.loads((prepared / "full-lock.json").read_text())["lock_id"],
+        "model": model,
+        "split": "eval",
+        "documents": [r["doc_id"] for r in records],
+        "preflight_sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest(),
+        "batch_size": 100,
+    }
+    return PreparedRun(model, prepared, output, records, rows, cfg, identity, budget)
+
+
+def document_indices(records, documents):
+    """Seleciona documentos inteiros, na ordem congelada, sem alterar indices do ledger."""
+    ids = [r["doc_id"] for r in records]
+    chosen = set(documents)
+    if not documents or len(chosen) != len(documents):
+        raise ValueError("selecao vazia ou duplicada")
+    if [doc for doc in ids if doc in chosen] != documents:
+        raise ValueError("documentos desconhecidos ou fora da ordem congelada")
+    return {
+        i * len(ARMS) + j for i, doc in enumerate(ids) if doc in chosen for j in range(len(ARMS))
+    }
+
+
+def run_selection(state, *, documents=None, batch=None, execute=False):
+    """Executor comum aos lotes fixos e ao Bash; um unico ledger/orcamento por modelo."""
+    with output_lock(state.output):
+        accepted = state.accepted()
+        report = export_progress(state.output, state.rows, state.records, accepted)
+        if documents is not None:
+            if batch is not None:
+                raise ValueError("escolha documentos ou lote, nunca ambos")
+            indices = document_indices(state.records, documents)
+            label = f"Rodada de {len(documents)} documentos"
+        else:
+            selected = batch or report["next_batch"]
+            indices = (
+                set(batch_indices(state.records, state.rows)[selected - 1]) if selected else set()
+            )
+            label = f"Lote {selected}/10" if selected else "Todos os lotes completos"
+        pending = indices - accepted
+        log(f"{state.model}: {label}; {len(pending)} geracoes pendentes (sem retries)")
+        if not execute:
+            log(f"Validado sem API; teto cumulativo: US$ {state.budget}")
+            return report
+        if pending:
+            with activity("Conferindo recursos das metricas"):
+                ensure_meteor_resources()
+            transport = OpenRouterFreeClient(load_key(), timeout=240)
+            remaining = None
+            if state.model == "ling-free":
+                with activity("Consultando cota gratuita"):
+                    quota = transport.quota()
+                save(state.output / "quota-before.json", quota)
+                remaining = (quota.get("free_model_daily_requests") or {}).get("remaining")
+                if type(remaining) is not int or remaining < 0:
+                    raise ValueError("cota gratuita indisponivel; nao iniciar chamadas")
+                log(f"Cota restante: {remaining}")
+            log(f"Teto cumulativo: US$ {state.budget}; modelo {state.model}")
+            try:
+                run(
+                    state.rows,
+                    TARGETS[state.model],
+                    state.folder,
+                    state.budget,
+                    state.identity,
+                    transport,
+                    max_new_calls=remaining,
+                    case_indices=indices,
+                    retry_reset_after=3600,
+                )
+            finally:
+                report = export_progress(state.output, state.rows, state.records, state.accepted())
+        if report["complete"]:
+            with activity(f"Calculando metricas dos 1000 documentos: {state.model}"):
+                score_results(
+                    {state.model: state.rows},
+                    state.records,
+                    state.cfg,
+                    state.prepared,
+                    state.output,
+                    {},
+                    "eval",
+                )
+        return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=("ling-free", "qwen37", "gemma26"), default="ling-free")
@@ -96,103 +244,10 @@ def main():
     parser.add_argument("--batch", type=int, choices=range(1, 11))
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
-    model = args.model
-    slug = {"ling-free": "ling", "qwen37": "qwen", "gemma26": "gemma"}[model]
-    args.prepared = args.prepared or Path(f"outputs/full-{slug}-prepared")
-    args.output = args.output or Path(f"outputs/full-{slug}-batches")
-    log(f"{model}: iniciando lote; modo={'EXECUTAR' if args.execute else 'VALIDAR SEM API'}")
-    with activity("1/4 Conferindo codigo, dataset e modelos congelados"):
-        frozen = verify_full_lock(prepared=args.prepared)
-    split, records = selected_records(args.prepared)
-    if split != "eval":
-        raise ValueError("lotes exclusivos da coorte final")
-    cfg = ExperimentConfig.from_yaml(args.prepared / "config.yaml")
-    plan = json.loads(Path("configs/openrouter_full.json").read_text())
-    target = plan["models"][model]
-    if TARGETS[model][:2] != (target["model"], target["provider"]):
-        raise ValueError("endpoint difere do congelado")
-    ceiling = money(0 if model == "ling-free" else frozen["budgets_usd"][f"{slug}_generation"])
-    budget = ceiling if args.budget_usd is None else args.budget_usd
-    if budget > ceiling:
-        raise ValueError("orcamento excede teto congelado do modelo")
-    with activity("2/4 Validando integridade e tokens dos 6000 prompts"):
-        rows = load_prepared(args.prepared, model, 1000)
-    limits = Limits(
-        cfg.generation.max_input_tokens, cfg.generation.max_new_tokens, target["context_length"]
-    )
-    for row in rows:
-        limits.check(row["prompt_tokens"])
-        if row["max_output_tokens"] != limits.max_output or not row.get("allow_length"):
-            raise ValueError("politica de saida difere do congelado")
-    groups = batch_indices(records, rows)
-    identity = {
-        "full_lock_id": json.loads((args.prepared / "full-lock.json").read_text())["lock_id"],
-        "model": model,
-        "split": "eval",
-        "documents": [r["doc_id"] for r in records],
-        "preflight_sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest(),
-        "batch_size": 100,
-    }
-    log("3/4 Conferindo respostas salvas e selecionando lote pendente")
-    args.output.mkdir(parents=True, exist_ok=True)
-    with (args.output / ".batches.lock").open("a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise ValueError("outra execucao usa estes lotes") from None
-        folder = args.output / model
-        accepted = accepted_cases(folder, rows, identity, model)
-        report = export_progress(args.output, rows, records, accepted)
-        selected = args.batch or report["next_batch"]
-        if selected is None:
-            print("Todos os lotes completos; nenhuma geracao pendente.")
-        else:
-            pending = set(groups[selected - 1]) - accepted
-            print(
-                f"Lote {selected}/10: {len(pending)} chamadas pendentes (sem retries).", flush=True
-            )
-        if not args.execute:
-            log(
-                f"Preflight dos 6000 prompts {model} validado; nenhuma chamada API. "
-                f"Teto cumulativo de geracao: US$ {budget} para os dez lotes."
-            )
-            return
-        with activity("4/4 Conferindo recursos das metricas"):
-            ensure_meteor_resources()
-        if selected is not None and pending:
-            transport = OpenRouterFreeClient(load_key(), timeout=240)
-            remaining = None
-            if model == "ling-free":
-                with activity("Consultando cota gratuita"):
-                    quota = transport.quota()
-                save(args.output / "quota-before.json", quota)
-                remaining = (quota.get("free_model_daily_requests") or {}).get("remaining")
-                if type(remaining) is not int or remaining < 0:
-                    raise ValueError("cota gratuita indisponivel; nao iniciar chamadas")
-                log(f"Cota restante: {remaining}")
-            log(f"Teto cumulativo para os dez lotes: US$ {budget}; modelo {model}")
-            try:
-                run(
-                    rows,
-                    TARGETS[model],
-                    folder,
-                    budget,
-                    identity,
-                    transport,
-                    max_new_calls=remaining,
-                    case_indices=set(groups[selected - 1]),
-                    retry_reset_after=3600,
-                )
-            finally:
-                accepted = accepted_cases(folder, rows, identity, model)
-                report = export_progress(args.output, rows, records, accepted)
-        if report["complete"]:
-            with activity(f"Calculando metricas dos 1000 documentos: {model}"):
-                score_results({model: rows}, records, cfg, args.prepared, args.output, {}, "eval")
-        else:
-            print(
-                "Lote encerrado. Repita o comando para retomar/avancar. Hipoteses somente aos 1000."
-            )
+    log(f"{args.model}: modo={'EXECUTAR' if args.execute else 'VALIDAR SEM API'}")
+    state = load_model(args.model, args.prepared, args.output, args.budget_usd)
+    run_selection(state, batch=args.batch, execute=args.execute)
+    log("Encerrado. Repita para retomar/avancar; hipoteses somente aos 1000/modelo.")
 
 
 if __name__ == "__main__":

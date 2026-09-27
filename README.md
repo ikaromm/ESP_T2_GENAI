@@ -9,12 +9,31 @@ Projeto de pesquisa de pós-graduação que compara recuperação de contexto e 
 | Dev10 | Concluído: 10 documentos × 6 braços × 3 modelos = 180 respostas |
 | Coorte final | 1.000 documentos reservados, IDs e ordem congelados |
 | Preparação do Ling | 6.000/6.000 prompts válidos; nenhum documento excluído |
-| Geração final do Ling | Iniciada pelo usuário; consulte o ledger e o status dos lotes |
+| Geração final do Ling | Primeiro lote concluído: 100 documentos, 600 respostas aceitas |
 | Preparação do Gemma | 6.000/6.000 prompts válidos; maior entrada de 43.088 tokens |
 | Qwen no full | Comando de lotes pronto; calibração paga integral ainda pendente |
-| Testes | 276 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
+| Testes | 287 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
 
 O comando dos lotes foi validado sem chamadas à API. O dev é exploratório; nenhuma hipótese foi confirmada como resultado do experimento final. Consulte o status salvo para acompanhar a execução posterior à atualização deste README.
+
+## Rodar os três modelos com um Bash
+
+```bash
+bash rodar_rodada.sh 100 --dry-run  # confere o plano sem API
+bash rodar_rodada.sh 100            # executa/retoma uma rodada nos três modelos
+```
+
+O número indica documentos da mesma coorte, com os mesmos IDs para os três modelos. Aceita de 1 a 1.000. O script preserva uma rodada incompleta e gera somente os braços faltantes. Como os primeiros 100 documentos do Ling já foram concluídos, começa completando esses mesmos documentos no Gemma e Qwen.
+
+**O comando sem `--dry-run` faz chamadas pagas no Gemma/Qwen e calibra o Qwen se necessário.** A calibração paga cobre os 1.000 documentos antes das gerações, mesmo em uma rodada de 100. Tetos monetários e frequências permanecem os já definidos. A rodada encerra após o grupo escolhido; uma falha preserva o plano para retomada.
+
+Auditar o primeiro lote Ling sem API:
+
+```bash
+bash rodar_rodada.sh --audit-ling-batch 1
+```
+
+Instruções, custos, arquivos de progresso e retomada: [guia do Bash](docs/rodadas-full.md). Resultado verificado: [auditoria do primeiro lote Ling](docs/auditoria-ling-lote1.md).
 
 ## Executar o Ling em lotes de 100
 
@@ -181,6 +200,7 @@ O backend de geração local, seus perfis antigos e suas dependências específi
 
 - [Protocolo científico](docs/protocolo.md)
 - [Dataset e splits](docs/dataset.md)
+- [Rodadas dos três modelos com Bash](docs/rodadas-full.md)
 - [Operação dos lotes Ling](docs/lotes-ling-full.md)
 - [Operação dos lotes Qwen e Gemma](docs/lotes-qwen-gemma-full.md)
 - [Configuração congelada e etapas do full](docs/full-congelado.md)

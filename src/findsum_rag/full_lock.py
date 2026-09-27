@@ -37,6 +37,8 @@ OPERATIONAL_COMPATIBILITY = {
     "src/findsum_rag/full_lock.py",
     "src/findsum_rag/progress.py",
     "scripts/run_ling_batches.py",
+    "scripts/run_full_round.py",
+    "rodar_rodada.sh",
     "scripts/run_prepared_paid.py",
     "scripts/screen_openrouter.py",
     "scripts/freeze_full_openrouter.py",

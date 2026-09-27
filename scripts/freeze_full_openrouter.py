@@ -47,6 +47,7 @@ def main():
         writer.writeheader()
         writer.writerows(dict(order=i, **r) for i, r in enumerate(cohort, 1))
     files = list(Path("src").rglob("*.py")) + list(Path("scripts").glob("*.py"))
+    files += [Path("rodar_rodada.sh")]
     files += [
         Path(x)
         for x in [

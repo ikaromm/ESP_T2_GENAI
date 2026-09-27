@@ -85,3 +85,12 @@ Gemma também preparado integralmente: 6.000 prompts, zero erros, maior entrada 
 Por solicitação do usuário, geração paga e sondas Qwen passam a no máximo 100 requisições/minuto por executor; Ling gratuito mantém 20. Retries contam na janela persistida e as chamadas continuam sequenciais. Sem mudanças nos prompts, coorte, parâmetros de geração, métricas ou tetos monetários. Nenhuma chamada API foi enviada nesta atualização.
 
 Lock operacional vigente: `c010b581a16b9011329df5eeb83bc798c44b9776df8da6237e3e59e7e7f037c3`. O anterior foi arquivado. Preparações Ling (`c0d3...`) e Gemma (`e40bea...`) são aceitas explicitamente por modelo, mantendo a identidade dos ledgers. Verificação real de ambos os diretórios passou; 276 testes passaram, além de Ruff e diff check.
+
+
+## Bash para rodadas comuns — 27/09/2026
+
+`bash rodar_rodada.sh 100` executa ou retoma uma rodada de até 100 documentos nos três modelos, usando os mesmos IDs e apenas braços faltantes. O argumento aceita de 1 a 1.000. Sem `--dry-run`, inclui APIs pagas e calibração Qwen integral se pendente. Um plano persistido impede avançar os documentos de um modelo enquanto a rodada ainda estiver incompleta nos outros. Comandos individuais e ledgers existentes permanecem compatíveis.
+
+Lock operacional atual: `3794c7aac888498c639c5393699e94820f225d00bf2007e785fe6100424f9d56`; o anterior `c010b5...` está arquivado. O Bash e o orquestrador foram incluídos no congelamento. Prompts, limites, frequências, preços máximos, coorte e métricas permaneceram iguais. 287 testes distintos passaram, além de Ruff, sintaxe Bash e diff check.
+
+O Bash real foi testado em `--dry-run`, inclusive partindo de outro diretório. Conferiu as preparações Ling/Gemma, auditou 600 respostas Ling e identificou as pendências corretas para os mesmos 100 documentos: 0 Ling, 600 Gemma, 600 Qwen. Nenhuma API foi enviada. Veja [guia de rodadas](rodadas-full.md) e [auditoria Ling](auditoria-ling-lote1.md).
