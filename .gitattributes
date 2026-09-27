@@ -1,0 +1,2 @@
+# Preserve os bytes do CSV congelado, incluindo CRLF produzido por csv.writer.
+configs/full-eval-cohort.csv -text whitespace=cr-at-eol
