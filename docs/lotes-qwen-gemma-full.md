@@ -56,7 +56,7 @@ A validação de hashes e a recontagem/auditoria dos prompts usam quatro trabalh
 
 Durante a geração, o terminal mostra documento/braço, tentativa, espera por frequência, tempo de resposta, tokens, custo e motivo de encerramento. Não imprime credenciais nem o texto dos prompts/resumos. Requests e respostas integrais ficam nos artefatos locais.
 
-O limite operacional é 20 requisições/minuto por executor. Evite rodadas simultâneas na mesma conta se precisar respeitar esse teto de forma agregada. Retries transitórios: até seis tentativas, esperas 1/2/4/8/16 segundos e respeito a `Retry-After`. Após esgotar tentativas, o executor de lotes permite nova rodada depois de uma hora. Falha de transporte com resultado desconhecido exige auditoria, para evitar cobrança/geração duplicada.
+O limite operacional dos modelos pagos é **100 requisições/minuto por executor**, incluindo geração, sondas de calibração Qwen e retries. O Ling gratuito mantém 20/minuto. As chamadas continuam sequenciais; aumentar o teto não cria concorrência nem garante 100 chamadas efetivas por minuto. Os timestamps da janela são preservados nas retomadas. Evite rodadas simultâneas na mesma conta se precisar respeitar esse teto de forma agregada. Retries transitórios: até seis tentativas, esperas 1/2/4/8/16 segundos e respeito a `Retry-After`. Após esgotar tentativas, o executor de lotes permite nova rodada depois de uma hora. Falha de transporte com resultado desconhecido exige auditoria, para evitar cobrança/geração duplicada.
 
 Cada diretório de resultados tem `batch-status.json` e uma subpasta `qwen37/` ou `gemma26/` com `ledger.json`, requests e respostas. O status dos lotes é atualizado ao encerrar a invocação; o ledger é atualizado a cada tentativa. Métricas locais e testes das cinco hipóteses são calculados após os 1.000 documentos daquele modelo.
 
@@ -74,3 +74,5 @@ O cenário extremo de todas as 6.000 respostas Gemma atingirem 8.192 tokens soma
 A conferência da preparação comum para Qwen (`calibrate` sem `--execute`) passou. As sondas pagas e a geração Qwen não foram iniciadas nesta atualização. Os 270 testes locais passaram, excluindo `slow` e `test_real_data.py`.
 
 O comando real `uv run --locked findsum gemma-batch` também terminou com código 0, sem `--execute`: 6.000 prompts conferidos, `next_batch=1`, 600 chamadas pendentes, nenhuma API. A etapa de integridade e recontagem levou 80,8 segundos.
+
+Em 27/09/2026, o teto pago foi elevado para 100/minuto por solicitação do usuário. É uma política local: o OpenRouter não impõe o teto gratuito de 20/minuto aos modelos pagos, mas provedores e saldo para requisições em andamento podem limitar o uso. Fontes: [suporte OpenRouter](https://openrouter.zendesk.com/hc/en-us/articles/39501163636379-OpenRouter-Rate-Limits-What-You-Need-to-Know) e [limites da API](https://openrouter.ai/docs/api_reference/limits).

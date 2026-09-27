@@ -12,7 +12,7 @@ Projeto de pesquisa de pós-graduação que compara recuperação de contexto e 
 | Geração final do Ling | Iniciada pelo usuário; consulte o ledger e o status dos lotes |
 | Preparação do Gemma | 6.000/6.000 prompts válidos; maior entrada de 43.088 tokens |
 | Qwen no full | Comando de lotes pronto; calibração paga integral ainda pendente |
-| Testes | 270 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
+| Testes | 276 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
 
 O comando dos lotes foi validado sem chamadas à API. O dev é exploratório; nenhuma hipótese foi confirmada como resultado do experimento final. Consulte o status salvo para acompanhar a execução posterior à atualização deste README.
 
@@ -61,6 +61,8 @@ uv run --locked findsum gemma-batch --execute
 ```
 
 Execute o comando do modelo desejado e repita nas próximas sessões. Cada invocação processa no máximo um lote. Os tetos são cumulativos para os dez lotes: **US$ 18 de geração Qwen**, **US$ 9 de geração Gemma**, além de **US$ 18 separados para calibração Qwen**. Nenhum desses comandos gera com o Ling.
+
+O teto operacional dos modelos pagos é **100 chamadas por minuto por executor**, incluindo retries e sondas Qwen; o Ling gratuito mantém **20/minuto**. As requisições permanecem sequenciais: 100/minuto é um máximo, não uma velocidade garantida.
 
 ## Dados e desenho experimental
 

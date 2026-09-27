@@ -62,7 +62,8 @@ class RequestWindow:
                 save(self.path, self.sent)
                 return
             delay = max(0, min(self.sent) + self.period - now) + 0.05
-            print(f"Limite de 20 chamadas/minuto: aguardando {delay:.2f}s", flush=True)
+            print(f"Limite de {self.limit} chamadas/{self.period}s: aguardando {delay:.2f}s",
+                  flush=True)
             self.sleep(delay)
 
 

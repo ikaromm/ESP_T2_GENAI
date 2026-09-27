@@ -20,7 +20,7 @@ from findsum_rag.examples import Example
 from findsum_rag.openrouter import OpenRouterFreeClient, OpenRouterHTTPError
 from findsum_rag.progress import activity, log
 from findsum_rag.prompts import build_prompt
-from run_prepared_paid import MAX_INPUT, money
+from run_prepared_paid import MAX_INPUT, TARGETS, money, requests_per_minute
 from screen_openrouter import save
 
 MODEL, PROVIDER, RESPONSE_PROVIDER = "qwen/qwen3.7-flash", "alibaba", "Alibaba"
@@ -65,7 +65,9 @@ class RemoteCounter:
         folder.mkdir(parents=True, exist_ok=True)
         from screen_openrouter import RequestWindow
 
-        self.limiter = RequestWindow(folder / "request-window.json")
+        self.limiter = RequestWindow(
+            folder / "request-window.json", limit=requests_per_minute(TARGETS["qwen37"])
+        )
         self.ledger_path = folder / "ledger.json"
         self.ledger = json.loads(self.ledger_path.read_text()) if self.ledger_path.exists() else []
 

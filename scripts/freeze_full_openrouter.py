@@ -21,7 +21,7 @@ from full_common import random_records
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify", action="store_true")
-    parser.add_argument("--compatible-prepared-lock", type=Path)
+    parser.add_argument("--compatible-prepared-lock", type=Path, action="append", default=[])
     args = parser.parse_args()
     if args.verify:
         result = verify_full_lock()
@@ -116,11 +116,19 @@ def main():
         },
     }
     result = json.loads(json.dumps(result))
-    if args.compatible_prepared_lock:
-        previous = json.loads(args.compatible_prepared_lock.read_text())
+    for prepared_lock in args.compatible_prepared_lock:
+        previous = json.loads(prepared_lock.read_text())
         if not compatible_preparation(previous, result):
             raise ValueError("mudanca cientifica impede reaproveitar preparacao anterior")
-        result["compatible_prepared_locks"] = [previous["lock_id"]]
+        report = json.loads((prepared_lock.parent / "report.json").read_text())
+        models = set(report.get("models", {}))
+        if not models or not models <= {"ling-free", "gemma26"}:
+            raise ValueError("preparacao local sem modelos reconhecidos")
+        ids = result.setdefault("compatible_prepared_locks", [])
+        if previous["lock_id"] not in ids:
+            ids.append(previous["lock_id"])
+        allowed = result.setdefault("compatible_prepared_models", {})
+        allowed[previous["lock_id"]] = sorted(set(allowed.get(previous["lock_id"], [])) | models)
     result["lock_id"] = lock_digest(result)
     DEFAULT_LOCK.write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print("Congelado:", result["lock_id"], len(cohort), "casos; 0 chamadas API")

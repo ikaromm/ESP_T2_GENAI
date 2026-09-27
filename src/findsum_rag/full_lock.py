@@ -38,6 +38,7 @@ OPERATIONAL_COMPATIBILITY = {
     "src/findsum_rag/progress.py",
     "scripts/run_ling_batches.py",
     "scripts/run_prepared_paid.py",
+    "scripts/screen_openrouter.py",
     "scripts/freeze_full_openrouter.py",
     "scripts/prepare_gemma_from_common.py",
     "scripts/prepare_qwen_remote.py",
@@ -132,7 +133,13 @@ def verify_full_lock(path=DEFAULT_LOCK, *, prepared=None, check_assets=True):
             if (
                 prepared_lock["lock_id"] not in data.get("compatible_prepared_locks", [])
                 or not compatible_preparation(prepared_lock, data)
-                or set(report.get("models", {})) != {"ling-free"}
+                or not set(report.get("models", {}))
+                or not set(report["models"])
+                <= set(
+                    data.get("compatible_prepared_models", {}).get(
+                        prepared_lock["lock_id"], ["ling-free"]
+                    )
+                )
             ):
                 raise ValueError("preparacao pertence a outro lock")
     # Evita atualizacao automatica de main nos modelos avaliadores/tokenizers.

@@ -30,6 +30,11 @@ MAX_OUTPUT = 3072
 MAX_INPUT = 49152
 
 
+def requests_per_minute(target):
+    """Teto operacional por executor; variantes gratuitas mantem 20 RPM."""
+    return 20 if target[0].endswith(":free") else 100
+
+
 def money(value):
     number = Decimal(str(value))
     if not number.is_finite() or number < 0:
@@ -284,7 +289,8 @@ def _run_locked(
     )
     if ledger["identity"] != identity:
         raise ValueError("identidade da retomada mudou")
-    limiter = RequestWindow(request_window or output / "request-window.json")
+    rpm = requests_per_minute(target)
+    limiter = RequestWindow(request_window or output / "request-window.json", limit=rpm)
     calls_this_session = 0
     current_document = None
     for index, row in enumerate(rows):
@@ -331,7 +337,7 @@ def _run_locked(
                 f"{row['doc_id']}/{row['arm']}; tentativa {attempt_number + 1}; "
                 "aguardando limite de requisicoes"
             )
-            with activity("Controle de frequencia (20 requisicoes/minuto)"):
+            with activity(f"Controle de frequencia ({rpm} requisicoes/minuto)"):
                 limiter.acquire()
             calls_this_session += 1
             stem = f"{index:04d}-{attempt_number}"

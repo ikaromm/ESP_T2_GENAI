@@ -78,3 +78,10 @@ Verificação real paralela do Ling: 6.000 prompts e 213 respostas já aceitas c
 Validação de código: 270 testes passaram, excluindo `slow` e `test_real_data.py`. Logs incluem etapas, progresso de prompts, atividade em esperas, requisições, retries, latência, tokens e custo. O paralelismo se restringe às operações locais de validação/preparação; não aumenta a concorrência das chamadas OpenRouter.
 
 Gemma também preparado integralmente: 6.000 prompts, zero erros, maior entrada 43.088 tokens; relatório local `outputs/full-gemma-prepared/report.json`. Qwen ainda exige sondas pagas; a validação sem `--execute` passou e não enviou chamadas.
+
+
+## Teto dos pagos atualizado em 27/09/2026
+
+Por solicitação do usuário, geração paga e sondas Qwen passam a no máximo 100 requisições/minuto por executor; Ling gratuito mantém 20. Retries contam na janela persistida e as chamadas continuam sequenciais. Sem mudanças nos prompts, coorte, parâmetros de geração, métricas ou tetos monetários. Nenhuma chamada API foi enviada nesta atualização.
+
+Lock operacional vigente: `c010b581a16b9011329df5eeb83bc798c44b9776df8da6237e3e59e7e7f037c3`. O anterior foi arquivado. Preparações Ling (`c0d3...`) e Gemma (`e40bea...`) são aceitas explicitamente por modelo, mantendo a identidade dos ledgers. Verificação real de ambos os diretórios passou; 276 testes passaram, além de Ruff e diff check.
