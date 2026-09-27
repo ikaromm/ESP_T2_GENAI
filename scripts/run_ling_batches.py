@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
+from threading import Lock
 
 from findsum_rag.config import ExperimentConfig
 from findsum_rag.full_lock import verify_full_lock
@@ -20,6 +21,8 @@ from full_common import ARMS, Limits, selected_records
 from run_experiment_openrouter import load_key, score_results
 from run_prepared_paid import TARGETS, load_prepared, money, request_payload, run, validate_response
 from screen_openrouter import save
+
+METRICS_LOCK = Lock()
 
 
 def batch_indices(records, rows):
@@ -172,7 +175,7 @@ def document_indices(records, documents):
     }
 
 
-def run_selection(state, *, documents=None, batch=None, execute=False):
+def run_selection(state, *, documents=None, batch=None, execute=False, stop_event=None):
     """Executor comum aos lotes fixos e ao Bash; um unico ledger/orcamento por modelo."""
     with output_lock(state.output):
         accepted = state.accepted()
@@ -208,21 +211,41 @@ def run_selection(state, *, documents=None, batch=None, execute=False):
                 log(f"Cota restante: {remaining}")
             log(f"Teto cumulativo: US$ {state.budget}; modelo {state.model}")
             try:
-                run(
-                    state.rows,
-                    TARGETS[state.model],
-                    state.folder,
-                    state.budget,
-                    state.identity,
-                    transport,
-                    max_new_calls=remaining,
-                    case_indices=indices,
-                    retry_reset_after=3600,
-                )
+                if state.model == "ling-free":
+                    run(
+                        state.rows,
+                        TARGETS[state.model],
+                        state.folder,
+                        state.budget,
+                        state.identity,
+                        transport,
+                        max_new_calls=remaining,
+                        case_indices=indices,
+                        retry_reset_after=3600,
+                        stop_event=stop_event,
+                    )
+                else:
+                    from run_paid_concurrent import run as run_concurrent
+
+                    run_concurrent(
+                        state.rows,
+                        TARGETS[state.model],
+                        state.folder,
+                        state.budget,
+                        state.identity,
+                        transport,
+                        case_indices=indices,
+                        stop_event=stop_event,
+                    )
             finally:
                 report = export_progress(state.output, state.rows, state.records, state.accepted())
         if report["complete"]:
-            with activity(f"Calculando metricas dos 1000 documentos: {state.model}"):
+            with (
+                activity(f"Metricas dos 1000 documentos (uma etapa por vez): {state.model}"),
+                METRICS_LOCK,
+            ):
+                if stop_event is not None and stop_event.is_set():
+                    return report
                 score_results(
                     {state.model: state.rows},
                     state.records,

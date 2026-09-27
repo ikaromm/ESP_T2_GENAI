@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-27T17:34:16.009107+00:00",
+  "created_at": "2026-09-27T15:02:34.986114+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -9,9 +9,8 @@
     "configs/openrouter_full.json": "600bba55865869e44c36a7f572e3cfb0e785faa16357acf6740ee3e032b798b7",
     "data/interim/splits-liquidity.json": "424c14a1ae687b64e046eca6c30a7d531010e3f6fb669444b410e8b1c27795d5",
     "pyproject.toml": "98fd97a9f92180f916edf6a0b8bb3551eb2173ab8f2bf721a2e55b23c4e136a0",
-    "rodar_rodada.sh": "c6461344f16622d00d77c8a8f58c52d48fdae0559a3d4fb30d466bb52bda6dff",
+    "rodar_rodada.sh": "2e63e19db14cb2693fac03f992c28a9a250ba53e0c2c6da93bc59cff763f47c1",
     "scripts/audit_example_metrics.py": "7c92b20683a4e16d8a93bdae0dcbaca50cef052dbacd9d634aa5d0ce4f2c7027",
-    "scripts/benchmark_paid_rates.py": "57b6e2a6a1137876e1303d9ccf173e96fac66ccba7d0d0cd6aa57be4a7e5bdd1",
     "scripts/budget_full_openrouter.py": "7692cbbd4ed430278eb973f8b6017d25f749c104282189f3f28235eb392ee8d4",
     "scripts/build_dev_review.py": "ee63e87a95d826b37791ab6c4288248d3a0f095ca60fa46c743e164ae5153b99",
     "scripts/build_example_guide.py": "dad9b3698c3b5059cccf1d7a813dd72af9b57d892db01cd1c39a3b10b830efc9",
@@ -20,24 +19,21 @@
     "scripts/export_paid_dev.py": "024741f15234a725e0989111ae04c8b5ae07a60c3d57adb95b047addafc8db34",
     "scripts/extend_reference_metrics.py": "b6c597b6ca3b7d1060c75d41d8d4c0654a484074ade0c6dbf789f9ae1271c029",
     "scripts/fetch_findsum.py": "0c499a09e9e4d5f0d9e1ccece980b770397d5113e603ad21d27d06f4f5969728",
-    "scripts/freeze_full_openrouter.py": "802a14f2e9cf25265720727cac3adfe496e4107cd3851b74fea47a4e04781693",
+    "scripts/freeze_full_openrouter.py": "1a1c2ca89cb1a9ffda1fde2ff19840434a3c75e9fe92f7a58f5e148434bb37ad",
     "scripts/full_common.py": "5600548ea81210188540b4d9e05aa8e0f51ab51439a0ec224f21e4a720ba7d7f",
     "scripts/poc_openrouter.py": "9bfb888c2442aa745492f778de36b59077e6d1f8e41402d16995d045f3c85e48",
     "scripts/prepare_dev_openrouter.py": "330d3478aa1ad89a6a616c5e228ad01c22a598e07e2de94001a3ffd349cd0620",
     "scripts/prepare_full_openrouter.py": "4a925ef3879ec3813a04ecef601a1c1ec1e0ee4f6059ab0c8e228957e4313535",
-    "scripts/prepare_gemma_from_common.py": "6b9ab0ed3529aa4ba8924d3b03dc594c008ac2626298cb022c914bab98e34516",
+    "scripts/prepare_gemma_from_common.py": "fcefed001ef06beea93d89991d75789214696bfbaae84218f8663f5726ed15de",
     "scripts/prepare_ling_from_common.py": "bb1463425eea535d6c5d5487e3d9ea044d955b9704e3081a8b6fea24f71277d0",
     "scripts/prepare_qwen_remote.py": "a259d1964428a5592663eb898cc2d8de20dc40b1cb8f0a5a8494344df8aae707",
-    "scripts/qwen_local_tokenizer.py": "1ea7ca099b1969f579339c52de27747c809220143000a1004a747974bafe1a72",
     "scripts/replay_gemma_paid.py": "b1da460ec40bae326464ff80e5b21042c4477dfc171765f84328c959b4bed6d0",
     "scripts/run_example_trace.py": "434d049829689841cccb973a9f6d442b8af03fa96f0d7c60096abe718721a1ec",
     "scripts/run_experiment_openrouter.py": "7bbe2c190b05466f444c0fd756b909f0643461aab6a899b5c8f6da78aa662618",
-    "scripts/run_full_round.py": "2b5809eabb63be9c78044ad86fb409c51c52f48e2f30bae95e7dc87b2e0600a1",
-    "scripts/run_ling_batches.py": "d465a9bc543399e80003a37c1384127453d7c92ad50d0724ec0a0b48ee26c7b4",
-    "scripts/run_paid_concurrent.py": "70203c923b28ad988712ee1334c0f0b6c09b437367f6f259b2f7c809f77fcc9a",
-    "scripts/run_prepared_paid.py": "fbeaf0bcd18c6526ec65a50bc20e76e792551bd7118adb8d23a42464c58291d9",
+    "scripts/run_full_round.py": "8efe3efb1101aab90fdd7bde0f24d423d384b5b6a9e9c6b82d34cc388282ff95",
+    "scripts/run_ling_batches.py": "6e1d01f2f4b84ded756bdb5842d7dfa754d218cccb989fbf2b4526cf4cacc650",
+    "scripts/run_prepared_paid.py": "980493436e5f48395351a53ef1b0111979ee3078d2d8d97f02bd0abf1ae58179",
     "scripts/screen_openrouter.py": "c6bbc499b7c5d2077f848954cfd6b315b8ac6e0a92a00b81e9a472d6b7b25021",
-    "scripts/update_progress_metrics.py": "0bd7eac8e10dc8c8e9280b755070ed8355cf30bc6778df75f657b587ebb780bd",
     "src/findsum_rag/__init__.py": "5d4308c9722fb1d8403488b999e2fcd5e02041f4d8f2b5ee441b4a9b54870f2f",
     "src/findsum_rag/analyze.py": "5dcb8172c289b7967dd43af4446355b949bcd2b5b089e987724e61688d45f994",
     "src/findsum_rag/chunking.py": "57b16bd5feeaf0a8d1169b1fdad6cdcfafdfc482351be6b72f28b581bb381d91",
@@ -47,7 +43,7 @@
     "src/findsum_rag/data.py": "16fdbf3875365ab34798e520e12ca78ebe5a83094b1e8499d05c45d2ceabc10e",
     "src/findsum_rag/examples.py": "b11cda5455e3779582936b6effaf1d19b8979e03fb92b49e87a96378bde0ee0a",
     "src/findsum_rag/factual.py": "5c52c80aa5efd4984ea32c1dcccfb191f118a0be01933b3d529de63cef80fec5",
-    "src/findsum_rag/full_lock.py": "b007a979018e8df8233db691cc6ebaa10283d580c69b92e08c66c9ba794f97fb",
+    "src/findsum_rag/full_lock.py": "f679fc86356fbbcb3abc3b1bd347c2de93d78c30f5c7e27b777106527480c791",
     "src/findsum_rag/generate.py": "7cf0533e6036ec7d8dbeba68103ee8862272dd85d11028170d62ac7edff9bc4e",
     "src/findsum_rag/grounding_audit.py": "7a8e329fc12c77306dfeaaea724aad531a9d02cb5e9ce260ad66355709418de2",
     "src/findsum_rag/metrics.py": "a5d1901126a24111dae78826df63be2861c3eb9a065babf35b965d6bb2fb01c9",
@@ -7214,8 +7210,7 @@
   },
   "compatible_prepared_locks": [
     "c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1",
-    "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0",
-    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41"
+    "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0"
   ],
   "compatible_prepared_models": {
     "c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1": [
@@ -7223,10 +7218,7 @@
     ],
     "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0": [
       "gemma26"
-    ],
-    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41": [
-      "qwen37"
     ]
   },
-  "lock_id": "dbb123823df36b891e33066602d5c4526448792000c004cca01b9af9465151bb"
+  "lock_id": "3794c7aac888498c639c5393699e94820f225d00bf2007e785fe6100424f9d56"
 }

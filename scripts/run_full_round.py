@@ -8,8 +8,10 @@ import json
 import subprocess
 import sys
 from collections import Counter
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event
 
 from findsum_rag.full_lock import DEFAULT_LOCK, verify_full_lock
 from findsum_rag.progress import log
@@ -23,6 +25,7 @@ from run_ling_batches import (
 )
 from run_prepared_paid import TARGETS, request_payload
 from screen_openrouter import save
+from update_progress_metrics import update_metrics
 
 MODELS = ("ling-free", "gemma26", "qwen37")
 SLUGS = {"ling-free": "ling", "gemma26": "gemma", "qwen37": "qwen"}
@@ -162,18 +165,18 @@ def prepare_missing(model, frozen):
             ["--source", "outputs/full-ling-prepared", "--output", str(prepared)],
         )
     elif model == "qwen37":
-        log("Qwen: calibracao PAGA integral dos 1000 documentos, antes das geracoes da rodada")
+        if prepared.exists():
+            raise ValueError("preparacao Qwen incompleta; preserve os artefatos para auditoria")
+        log("Qwen: preparacao LOCAL dos 1000 documentos; zero sondas pagas")
         child(
-            "prepare_qwen_remote.py",
+            "prepare_gemma_from_common.py",
             [
-                "--prepared",
+                "--model",
+                "qwen37",
+                "--source",
                 "outputs/full-ling-prepared",
                 "--output",
                 str(prepared),
-                "--budget-usd",
-                str(frozen["budgets_usd"]["qwen_calibration"]),
-                "--allow-eval",
-                "--execute",
             ],
         )
     else:
@@ -206,24 +209,47 @@ def inspect_models(records):
 
 def execute_round(plan, records, states, accepted, frozen, root):
     errors = {}
-    for model in MODELS:
+    stop_event = Event()
+
+    def execute_model(model):
+        error = None
         try:
             if model not in states:
                 prepare_missing(model, frozen)
                 states[model] = load_model(model, *paths(model))
                 if states[model].records != records:
                     raise ValueError("coorte preparada diverge")
-            run_selection(states[model], documents=plan["documents"], execute=True)
+            run_selection(
+                states[model], documents=plan["documents"], execute=True, stop_event=stop_event
+            )
         except Exception as exc:
-            # Erros de um modelo nao impedem a tentativa dos outros na MESMA rodada.
-            # Nao serializar corpos de erros HTTP, que podem conter dados privados.
-            errors[model] = {"type": type(exc).__name__}
+            error = {"type": type(exc).__name__}
             if isinstance(exc, ValueError):
-                errors[model]["message"] = str(exc)
-            log(f"{model}: etapa interrompida ({errors[model]}); rodada preservada")
+                error["message"] = str(exc)
+            log(f"{model}: etapa interrompida ({error}); rodada preservada")
         finally:
             if model in states:
                 accepted[model] = states[model].accepted()
+        return error
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {pool.submit(execute_model, model): model for model in MODELS}
+        while futures:
+            try:
+                done, _ = wait(futures, timeout=0.2, return_when=FIRST_COMPLETED)
+                for future in done:
+                    model = futures.pop(future)
+                    try:
+                        error = future.result()
+                    except Exception as exc:
+                        error = {"type": type(exc).__name__}
+                    if error:
+                        errors[model] = error
+            except KeyboardInterrupt:
+                stop_event.set()
+                log(
+                    "Interrompendo envios; recolhendo respostas ja em voo para preservar a retomada"
+                )
     pending = remaining(records, plan["documents"], accepted)
     result = {
         "plan_id": plan["plan_id"],
@@ -246,6 +272,9 @@ def main():
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--dry-run", action="store_true", help="valida e planeja sem API")
     modes.add_argument(
+        "--metrics-only", action="store_true", help="atualiza metricas e painel sem geracao"
+    )
+    modes.add_argument(
         "--audit-ling-batch",
         type=int,
         choices=range(1, 11),
@@ -260,17 +289,22 @@ def main():
         return
     log(
         "MODO SEM API"
-        if args.dry_run
-        else "MODO EXECUCAO: Ling gratuito + Gemma/Qwen pagos; calibracao Qwen paga se pendente"
+        if args.dry_run or args.metrics_only
+        else "MODO EXECUCAO: Ling gratuito + Gemma/Qwen pagos; preparacao Qwen sem API"
     )
     with output_lock(ROOT):
         frozen = verify_full_lock(DEFAULT_LOCK)
         records = frozen["cohort"]
         states, accepted = inspect_models(records)
+        if args.metrics_only:
+            update_metrics(records, states)
+            return
         audit_batch(states["ling-free"], 1)
         plan = round_plan(ROOT, records, accepted, args.cases, persist=not args.dry_run)
         if plan is None:
             log("Os tres modelos ja concluiram todos os documentos; nenhuma geracao pendente")
+            if not args.dry_run:
+                update_metrics(records, states)
             return
         pending = remaining(records, plan["documents"], accepted)
         preview = {
@@ -281,7 +315,7 @@ def main():
         }
         save(ROOT / "preview.json", preview)
         log(f"Rodada de {len(plan['documents'])} documentos; pendencias: {pending}")
-        log("Tetos cumulativos: Ling US$0; Gemma US$9; Qwen geracao US$18 + calibracao US$18")
+        log("Tetos cumulativos: Ling US$0; Gemma US$9; Qwen geracao US$18; preparacao local US$0")
         if args.dry_run:
             log("Validacao encerrada sem API. Nenhuma rodada ativa criada ou avancada")
             return
@@ -290,6 +324,7 @@ def main():
             f"Rodada {'concluida' if result['complete'] else 'pendente'}: "
             f"{result['pending_generations']}"
         )
+        update_metrics(records, states)
         if not result["complete"]:
             raise SystemExit(1)
 

@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 
-def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypatch):
+@pytest.mark.parametrize("model", ["ling-free", "qwen37"])
+def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypatch, model):
     monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
     core = importlib.import_module("run_prepared_paid")
     common = importlib.import_module("full_common")
@@ -21,7 +22,7 @@ def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypat
     manifest.parent.mkdir(parents=True)
     manifest.write_text("{}")
     folder = tmp_path / "prepared"
-    (folder / "ling-free").mkdir(parents=True)
+    (folder / model / "tokenizer").mkdir(parents=True)
     (folder / "selection.json").write_text(
         json.dumps(
             {
@@ -42,7 +43,7 @@ def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypat
         }
         for arm in common.ARMS
     ]
-    preflight = folder / "ling-free/preflight.json"
+    preflight = folder / model / "preflight.json"
     preflight.write_text(json.dumps(rows))
     monkeypatch.setattr(common, "selected_records", lambda _: ("eval", [{"doc_id": "a"}]))
     threads = set()
@@ -57,14 +58,16 @@ def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypat
         encode=encode,
     )
     monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *a, **k: tokenizer)
-    assert core.load_prepared(folder, "ling-free", 1, validation_workers=1) == rows
+    local = importlib.import_module("qwen_local_tokenizer")
+    monkeypatch.setattr(local, "load_qwen_tokenizer", lambda _: tokenizer)
+    assert core.load_prepared(folder, model, 1, validation_workers=1) == rows
     threads.clear()
-    assert core.load_prepared(folder, "ling-free", 1, validation_workers=4) == rows
+    assert core.load_prepared(folder, model, 1, validation_workers=4) == rows
     assert len(threads) > 1
     rows[-1]["prompt_tokens"] = 5
     preflight.write_text(json.dumps(rows))
     with pytest.raises(ValueError, match="contagem local alterada"):
-        core.load_prepared(folder, "ling-free", 1, validation_workers=4)
+        core.load_prepared(folder, model, 1, validation_workers=4)
 
 
 def test_heartbeat_exits_on_error(capsys):

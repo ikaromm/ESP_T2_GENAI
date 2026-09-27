@@ -1,5 +1,8 @@
 # Full OpenRouter congelado
 
+> **Atualização de 27/09/2026:** a preparação Qwen do fluxo de lotes passou a ser local, usando o tokenizer Qwen3.8-27B com revisão/hashes fixados e compatibilidade verificada nas 332 sondas do dev. O Bash não envia sondas de calibração. As instruções e custos de calibração remota abaixo descrevem o planejamento histórico; a parcela estimada de US$ 14,56 deixa de ser necessária nesse fluxo. Consulte [rodadas atuais](rodadas-full.md) e [preparação Qwen/Gemma](lotes-qwen-gemma-full.md). O teto legado de calibração permanece no contrato histórico, mas não é utilizado pela preparação local.
+
+
 Organização realizada em 26/09/2026, **sem executar o full nem chamadas de calibração**. A geração local de LLM foi removida; embeddings, FAISS e métricas permanecem locais. Alterações não foram commitadas nem publicadas.
 
 ## Contrato

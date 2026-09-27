@@ -128,14 +128,19 @@ def load_prepared(folder, name, n_docs, *, validation_workers=4):
     if len(rows) != 6 * n_docs or len({(r["doc_id"], r["arm"]) for r in rows}) != len(rows):
         raise ValueError("lote incompleto/duplicado")
     tokenizer = None
-    if name != "qwen37":
+    if name != "qwen37" or (folder / name / "tokenizer").is_dir():
         from transformers import AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            folder / name / "tokenizer", local_files_only=True
-        )
+        if name == "qwen37":
+            from qwen_local_tokenizer import load_qwen_tokenizer
+
+            tokenizer = load_qwen_tokenizer(folder / name / "tokenizer")
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(
+                folder / name / "tokenizer", local_files_only=True
+            )
     accepted_probes = None
-    if name == "qwen37":
+    if tokenizer is None:
         ledger = json.loads((folder / name / "calibration/ledger.json").read_text())
         accepted_probes = {r["key"]: r for r in ledger if r["status"] == "accepted"}
 
@@ -243,6 +248,7 @@ def run(
     retry_reset_after=None,
     request_window=None,
     case_indices=None,
+    stop_event=None,
 ):
     output.mkdir(parents=True, exist_ok=True)
     with (output / ".run.lock").open("a") as lock:
@@ -262,6 +268,7 @@ def run(
             retry_reset_after=retry_reset_after,
             request_window=request_window,
             case_indices=case_indices,
+            stop_event=stop_event,
         )
 
 
@@ -278,6 +285,7 @@ def _run_locked(
     retry_reset_after=None,
     request_window=None,
     case_indices=None,
+    stop_event=None,
 ):
     ledger_path = output / "ledger.json"
     if not ledger_path.exists() and any(p.name != ".run.lock" for p in output.iterdir()):
@@ -294,6 +302,8 @@ def _run_locked(
     calls_this_session = 0
     current_document = None
     for index, row in enumerate(rows):
+        if stop_event is not None and stop_event.is_set():
+            raise ValueError("execucao interrompida")
         if case_indices is not None and index not in case_indices:
             continue
         reserve = reservation(target, row)
@@ -339,6 +349,8 @@ def _run_locked(
             )
             with activity(f"Controle de frequencia ({rpm} requisicoes/minuto)"):
                 limiter.acquire()
+            if stop_event is not None and stop_event.is_set():
+                raise ValueError("execucao interrompida")
             calls_this_session += 1
             stem = f"{index:04d}-{attempt_number}"
             attempt = {

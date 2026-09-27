@@ -67,7 +67,7 @@ def test_failure_preserves_round_and_other_models_continue_without_duplicates(
     sent = {m: [] for m in rounds.MODELS}
     fail = [True]
 
-    def execute(state, *, documents, execute):
+    def execute(state, *, documents, execute, stop_event=None):
         assert execute
         indices = rounds.document_indices(records, documents)
         pending = sorted(indices - accepted[state.model])
@@ -199,3 +199,74 @@ def test_audit_checks_failed_requests_too(rounds, tmp_path):
     (state.folder / "0001-0.request.json").write_text("{}")
     with pytest.raises(ValueError, match="historico"):
         rounds.audit_batch(state)
+
+
+def test_qwen_missing_prepares_locally_without_paid_probes(rounds, tmp_path, monkeypatch):
+    prepared = tmp_path / "qwen"
+    monkeypatch.setattr(rounds, "paths", lambda _: (prepared, tmp_path / "run"))
+    calls = []
+    monkeypatch.setattr(rounds, "child", lambda script, args: calls.append((script, args)))
+    rounds.prepare_missing("qwen37", {})
+    assert calls == [
+        (
+            "prepare_gemma_from_common.py",
+            [
+                "--model",
+                "qwen37",
+                "--source",
+                "outputs/full-ling-prepared",
+                "--output",
+                str(prepared),
+            ],
+        )
+    ]
+    prepared.mkdir()
+    with pytest.raises(ValueError, match="incompleta"):
+        rounds.prepare_missing("qwen37", {})
+
+
+def test_models_execute_simultaneously_with_same_documents(rounds, tmp_path, monkeypatch):
+    from threading import Barrier
+
+    records = cohort()
+    accepted = {model: set() for model in rounds.MODELS}
+    states = {m: SimpleNamespace(model=m, accepted=lambda m=m: accepted[m]) for m in rounds.MODELS}
+    plan = rounds.round_plan(tmp_path, records, accepted, 100, persist=True)
+    barrier = Barrier(3)
+
+    def execute(state, *, documents, execute, stop_event=None):
+        assert execute and not stop_event.is_set()
+        barrier.wait(timeout=3)
+        accepted[state.model].update(rounds.document_indices(records, documents))
+
+    monkeypatch.setattr(rounds, "run_selection", execute)
+    result = rounds.execute_round(plan, records, states, accepted, {}, tmp_path)
+    assert result["complete"] and not result["errors"]
+
+
+@pytest.mark.parametrize("model", ["qwen37", "gemma26"])
+def test_paid_batch_uses_adaptive_executor(rounds, tmp_path, monkeypatch, model):
+    batcher = importlib.import_module("run_ling_batches")
+    adaptive = importlib.import_module("run_paid_concurrent")
+    records = cohort()
+    rows = [{"doc_id": r["doc_id"], "arm": arm} for r in records for arm in batcher.ARMS]
+    state = batcher.PreparedRun(
+        model, tmp_path, tmp_path, records, rows, None, {}, batcher.money(9)
+    )
+    accepted = set()
+    monkeypatch.setattr(batcher.PreparedRun, "accepted", lambda _: accepted.copy())
+    monkeypatch.setattr(batcher, "ensure_meteor_resources", lambda: None)
+    monkeypatch.setattr(batcher, "load_key", lambda: "mock")
+    monkeypatch.setattr(batcher, "OpenRouterFreeClient", lambda *a, **k: None)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("executor serial pago invocado")
+
+    def concurrent(*args, case_indices, **kwargs):
+        assert len(case_indices) == 600
+        accepted.update(case_indices)
+
+    monkeypatch.setattr(batcher, "run", forbidden)
+    monkeypatch.setattr(adaptive, "run", concurrent)
+    result = batcher.run_selection(state, documents=[str(i) for i in range(100)], execute=True)
+    assert result["accepted_generations"] == 600

@@ -1,5 +1,8 @@
 # Orçamento do full — 26/09/2026
 
+> **Atualização de 27/09/2026:** a preparação Qwen do fluxo de lotes passou a ser local, usando o tokenizer Qwen3.8-27B com revisão/hashes fixados e compatibilidade verificada nas 332 sondas do dev. O Bash não envia sondas de calibração. As instruções e custos de calibração remota abaixo descrevem o planejamento histórico; a parcela estimada de US$ 14,56 deixa de ser necessária nesse fluxo. Consulte [rodadas atuais](rodadas-full.md) e [preparação Qwen/Gemma](lotes-qwen-gemma-full.md). O teto legado de calibração permanece no contrato histórico, mas não é utilizado pela preparação local.
+
+
 Estimativa para 1.000 documentos × seis braços × três modelos: **18.000 gerações**. Todo o Ling é precificado como pago neste orçamento. Não foram feitas novas gerações ou sondas de calibração para calculá-lo.
 
 ## Estimativa principal

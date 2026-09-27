@@ -2,6 +2,18 @@
 
 Projeto de pesquisa de pós-graduação que compara recuperação de contexto e seleção de exemplos na sumarização de relatórios financeiros do **FINDSum Liquidity**. A geração usa exclusivamente a API do **OpenRouter**. Preparação, embeddings, FAISS e métricas são executados localmente.
 
+## Painel atualizado por rodada
+
+![Acompanhamento FINDSum](results/progress/dashboard.png)
+
+Ao terminar `bash rodar_rodada.sh 100`, o script atualiza as métricas locais e este painel. A comparação usa o prefixo da coorte com seis braços completos nos três modelos. [Tabela completa e evolução](results/progress/README.md) · [Como funciona](docs/metricas-automaticas.md).
+
+```bash
+bash rodar_rodada.sh --metrics-only  # atualiza métricas e visual sem gerar respostas
+```
+
+Os arquivos ficam prontos para commit; o Bash não publica automaticamente no Git.
+
 ## Resultados parciais dos primeiros 100 documentos
 
 Os três modelos concluíram os mesmos 100 documentos × seis braços, totalizando 1.800 respostas. A [matriz e interpretação das métricas](docs/metricas-primeiros100-20260927.md) e os [resultados por documento](results/first100-20260927/) estão versionados. C1 liderou as médias de BERTScore F1, ROUGE-L e METEOR em cada modelo; C2 superou C1t, mas ficou abaixo de C1. São resultados descritivos parciais, sem testes de significância ou confirmação de hipóteses. Este registro atualiza a situação da geração para este lote; o restante da coorte continua pendente.
@@ -15,10 +27,12 @@ Os três modelos concluíram os mesmos 100 documentos × seis braços, totalizan
 | Preparação do Ling | 6.000/6.000 prompts válidos; nenhum documento excluído |
 | Geração final do Ling | Primeiro lote concluído: 100 documentos, 600 respostas aceitas |
 | Preparação do Gemma | 6.000/6.000 prompts válidos; maior entrada de 43.088 tokens |
-| Qwen no full | Comando de lotes pronto; calibração paga integral ainda pendente |
-| Testes | 287 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
+| Qwen no full | Preparação local integral com tokenizer validado em 332 sondas do dev |
+| Geração dos três modelos | Primeiro lote concluído: mesmos 100 documentos, 600 respostas por modelo |
+| Métricas parciais | 1.800 pares avaliados; atualização incremental automática e painel no Git |
+| Testes | 308 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
 
-O comando dos lotes foi validado sem chamadas à API. O dev é exploratório; nenhuma hipótese foi confirmada como resultado do experimento final. Consulte o status salvo para acompanhar a execução posterior à atualização deste README.
+O comando dos lotes foi validado sem chamadas à API; depois foi executado um [teste pago de concorrência](docs/teste-vazao-openrouter-20260927.md), com respostas aproveitadas no full. O Bash agora executa os modelos em paralelo; Qwen/Gemma usam teto de 500 RPM por modelo com [retry adaptativo](docs/retry-adaptativo-openrouter.md). Ling mantém 20 RPM. O dev é exploratório; nenhuma hipótese foi confirmada como resultado do experimento final. Consulte o status salvo para acompanhar a execução posterior à atualização deste README.
 
 ## Rodar os três modelos com um Bash
 
@@ -27,9 +41,9 @@ bash rodar_rodada.sh 100 --dry-run  # confere o plano sem API
 bash rodar_rodada.sh 100            # executa/retoma uma rodada nos três modelos
 ```
 
-O número indica documentos da mesma coorte, com os mesmos IDs para os três modelos. Aceita de 1 a 1.000. O script preserva uma rodada incompleta e gera somente os braços faltantes. Como os primeiros 100 documentos do Ling já foram concluídos, começa completando esses mesmos documentos no Gemma e Qwen.
+O número indica documentos da mesma coorte, com os mesmos IDs para os três modelos. Aceita de 1 a 1.000. O script preserva uma rodada incompleta e gera somente os braços faltantes. Os primeiros 100 documentos já estão concluídos nos três modelos; a próxima rodada selecionará os documentos 101–200, mantendo a ordem congelada.
 
-**O comando sem `--dry-run` faz chamadas pagas no Gemma/Qwen e calibra o Qwen se necessário.** A calibração paga cobre os 1.000 documentos antes das gerações, mesmo em uma rodada de 100. Tetos monetários e frequências permanecem os já definidos. A rodada encerra após o grupo escolhido; uma falha preserva o plano para retomada.
+**O comando de execução faz chamadas pagas de geração no Gemma/Qwen; `--dry-run`, `--metrics-only` e `--audit-ling-batch` não geram respostas.** A preparação Qwen é local, cobre os 1.000 documentos e não envia sondas à API. Tetos monetários e frequências permanecem os já definidos. A rodada encerra após o grupo escolhido; uma falha preserva o plano para retomada.
 
 Auditar o primeiro lote Ling sem API:
 
@@ -74,7 +88,7 @@ O Ling usa preço máximo zero, provedor fixo e **nenhum fallback pago**. Não �
 
 ## Qwen e Gemma em lotes de 100
 
-Os dois modelos usam os mesmos grupos do Ling, com pastas e retomadas independentes. O Gemma pode ser preparado localmente com `uv run --locked findsum prepare-gemma`. O Qwen exige uma calibração paga completa antes das gerações. Veja a sequência de preparação no [guia de lotes Qwen/Gemma](docs/lotes-qwen-gemma-full.md).
+Os dois modelos usam os mesmos grupos do Ling, com pastas e retomadas independentes. O Gemma pode ser preparado localmente com `uv run --locked findsum prepare-gemma`. O Qwen usa contagem local; prepare antecipadamente os 6.000 prompts com `uv run --locked python scripts/prepare_gemma_from_common.py --model qwen37 --source outputs/full-ling-prepared --output outputs/full-qwen-prepared`. Veja a sequência de preparação no [guia de lotes Qwen/Gemma](docs/lotes-qwen-gemma-full.md).
 
 Depois de preparados, valide sem API com `findsum qwen-batch` ou `findsum gemma-batch`. Para executar um lote:
 
@@ -83,7 +97,7 @@ uv run --locked findsum qwen-batch --execute
 uv run --locked findsum gemma-batch --execute
 ```
 
-Execute o comando do modelo desejado e repita nas próximas sessões. Cada invocação processa no máximo um lote. Os tetos são cumulativos para os dez lotes: **US$ 18 de geração Qwen**, **US$ 9 de geração Gemma**, além de **US$ 18 separados para calibração Qwen**. Nenhum desses comandos gera com o Ling.
+Execute o comando do modelo desejado e repita nas próximas sessões. Cada invocação processa no máximo um lote. Os tetos são cumulativos para os dez lotes: **US$ 18 de geração Qwen**, **US$ 9 de geração Gemma**; a preparação local Qwen não consome créditos. Nenhum desses comandos gera com o Ling.
 
 O teto operacional dos modelos pagos é **100 chamadas por minuto por executor**, incluindo retries e sondas Qwen; o Ling gratuito mantém **20/minuto**. As requisições permanecem sequenciais: 100/minuto é um máximo, não uma velocidade garantida.
 
@@ -184,7 +198,7 @@ Além de `ling-batch`, estão disponíveis:
 | `findsum prepare-gemma` | Preflight local reutilizando os insumos comuns do Ling |
 | `findsum verify-full` | Verifica o congelamento offline |
 | `findsum prepare` | Prepara fonte, recuperação, exemplos e prompts locais |
-| `findsum calibrate` | Faz a contagem remota do Qwen; sondas cobradas somente com `--execute` |
+| `findsum calibrate` | Comando legado de sondas remotas; não necessário nem acionado pelas rodadas atuais |
 | `findsum run` | Executor integrado dos três modelos, com preparação local e Qwen já calibrado |
 
 `calibrate` e `run` exigem `--allow-eval` para o conjunto final e `--execute` para enviar chamadas. Os três comandos `*-batch --execute` operam a coorte final congelada e não exigem `--allow-eval`. O executor integrado não é um comando exclusivo de Qwen/Gemma; não o use como continuação automática da rodada Ling já iniciada. Consulte [full congelado](docs/full-congelado.md) antes das etapas pagas.

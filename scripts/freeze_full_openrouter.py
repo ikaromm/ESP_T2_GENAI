@@ -123,8 +123,12 @@ def main():
             raise ValueError("mudanca cientifica impede reaproveitar preparacao anterior")
         report = json.loads((prepared_lock.parent / "report.json").read_text())
         models = set(report.get("models", {}))
-        if not models or not models <= {"ling-free", "gemma26"}:
+        if not models or not models <= {"ling-free", "gemma26", "qwen37"}:
             raise ValueError("preparacao local sem modelos reconhecidos")
+        if "qwen37" in models:
+            from qwen_local_tokenizer import load_qwen_tokenizer
+
+            load_qwen_tokenizer(prepared_lock.parent / "qwen37" / "tokenizer")
         ids = result.setdefault("compatible_prepared_locks", [])
         if previous["lock_id"] not in ids:
             ids.append(previous["lock_id"])

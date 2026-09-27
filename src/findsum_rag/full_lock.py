@@ -44,6 +44,10 @@ OPERATIONAL_COMPATIBILITY = {
     "scripts/freeze_full_openrouter.py",
     "scripts/prepare_gemma_from_common.py",
     "scripts/prepare_qwen_remote.py",
+    "scripts/qwen_local_tokenizer.py",
+    "scripts/benchmark_paid_rates.py",
+    "scripts/run_paid_concurrent.py",
+    "scripts/update_progress_metrics.py",
 }
 
 
