@@ -4,4 +4,4 @@
 set -euo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd -- "$repo_dir"
-exec uv run --locked python -u scripts/run_full_round.py "$@"
+exec uv run --locked python -u -m scripts.execution.run_full_round "$@"

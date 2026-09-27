@@ -10,8 +10,8 @@ import pytest
 
 @pytest.fixture
 def rounds(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("run_full_round")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.execution.run_full_round")
 
 
 def cohort():
@@ -121,7 +121,7 @@ def test_invalid_size_rejected_before_work(rounds, monkeypatch, value):
 
 
 def test_finished_ling_selection_never_opens_api(rounds, tmp_path, monkeypatch):
-    batcher = importlib.import_module("run_ling_batches")
+    batcher = importlib.import_module("scripts.execution.run_ling_batches")
     records = cohort()
     rows = [{"doc_id": r["doc_id"], "arm": arm} for r in records for arm in batcher.ARMS]
     state = batcher.PreparedRun(
@@ -138,8 +138,8 @@ def test_finished_ling_selection_never_opens_api(rounds, tmp_path, monkeypatch):
 
 
 def test_audit_checks_failed_requests_too(rounds, tmp_path):
-    batcher = importlib.import_module("run_ling_batches")
-    core = importlib.import_module("run_prepared_paid")
+    batcher = importlib.import_module("scripts.execution.run_ling_batches")
+    core = importlib.import_module("scripts.execution.run_prepared_paid")
     records = cohort()
     rows = [
         {"doc_id": r["doc_id"], "arm": arm, "messages": [], "prompt_tokens": 100}
@@ -209,7 +209,7 @@ def test_qwen_missing_prepares_locally_without_paid_probes(rounds, tmp_path, mon
     rounds.prepare_missing("qwen37", {})
     assert calls == [
         (
-            "prepare_gemma_from_common.py",
+            "scripts.preparation.prepare_gemma_from_common",
             [
                 "--model",
                 "qwen37",
@@ -246,8 +246,8 @@ def test_models_execute_simultaneously_with_same_documents(rounds, tmp_path, mon
 
 @pytest.mark.parametrize("model", ["qwen37", "gemma26"])
 def test_paid_batch_uses_adaptive_executor(rounds, tmp_path, monkeypatch, model):
-    batcher = importlib.import_module("run_ling_batches")
-    adaptive = importlib.import_module("run_paid_concurrent")
+    batcher = importlib.import_module("scripts.execution.run_ling_batches")
+    adaptive = importlib.import_module("scripts.execution.run_paid_concurrent")
     records = cohort()
     rows = [{"doc_id": r["doc_id"], "arm": arm} for r in records for arm in batcher.ARMS]
     state = batcher.PreparedRun(

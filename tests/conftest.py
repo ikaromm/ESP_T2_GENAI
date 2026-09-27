@@ -21,8 +21,7 @@ from findsum_rag.data import Task
 DOC_SEGMENTS = {
     "doc0": [
         (
-            "net cash used in operating activities was $ 50.0 million "
-            "replace_table_token_1_th",
+            "net cash used in operating activities was $ 50.0 million replace_table_token_1_th",
             "cash flow net cash used in operating activities was $ 50.0 million",
         ),
         (

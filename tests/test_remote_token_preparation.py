@@ -9,8 +9,8 @@ import pytest
 
 @pytest.fixture
 def remote(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("prepare_qwen_remote")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.preparation.prepare_qwen_remote")
 
 
 def test_remote_count_is_cached_and_budget_is_checked_first(remote, tmp_path):
@@ -88,7 +88,8 @@ def test_unused_success_reservation_is_released_but_actual_cost_counts(remote, t
 def test_calibration_dry_run_never_instantiates_api_counter(remote, tmp_path, monkeypatch):
     import json
 
-    import full_common
+    from scripts.common import full_common
+
     from findsum_rag.config import ExperimentConfig
 
     prepared = tmp_path / "prepared"

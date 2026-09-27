@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "before_commit": "6177508298f87030f62cfd29727f374b965342ed",
+  "moves": {
+    "scripts/fetch_findsum.py": {
+      "path": "scripts/data/fetch_findsum.py",
+      "before_sha256": "0c499a09e9e4d5f0d9e1ccece980b770397d5113e603ad21d27d06f4f5969728",
+      "after_sha256": "98a8dcfb914f7d5d630bdd487e1d21831177b0bb191f84087951898511b7ef40",
+      "review": "raiz do checkout agora dois niveis acima"
+    },
+    "scripts/build_splits.py": {
+      "path": "scripts/data/build_splits.py",
+      "before_sha256": "2bc34c518e28a0fa51a083c2902da7219b834a21336396c58b34d2c98a747748",
+      "after_sha256": "bd901657eeff8ae9a415b245d1499467637c79e8edd43de5f2a8214ee75ceb60",
+      "review": "raiz do checkout agora dois niveis acima e exemplos de comando"
+    },
+    "scripts/prepare_full_openrouter.py": {
+      "path": "scripts/preparation/prepare_full_openrouter.py",
+      "before_sha256": "4a925ef3879ec3813a04ecef601a1c1ec1e0ee4f6059ab0c8e228957e4313535",
+      "after_sha256": "6932639f6a1b41d6ce487f03636a857a2ef195897acd3f7f728395ed59ef20c7",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/prepare_dev_openrouter.py": {
+      "path": "scripts/preparation/prepare_dev_openrouter.py",
+      "before_sha256": "330d3478aa1ad89a6a616c5e228ad01c22a598e07e2de94001a3ffd349cd0620",
+      "after_sha256": "c7aec53c3f7fb70539defba0c7775723018f02eb485e51337ee1c146b556230c",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/prepare_gemma_from_common.py": {
+      "path": "scripts/preparation/prepare_gemma_from_common.py",
+      "before_sha256": "6b9ab0ed3529aa4ba8924d3b03dc594c008ac2626298cb022c914bab98e34516",
+      "after_sha256": "0518e4c5362dc27774e35933aff332827b15f1f3a4ef7c30399f157655dfa7a8",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/prepare_ling_from_common.py": {
+      "path": "scripts/preparation/prepare_ling_from_common.py",
+      "before_sha256": "bb1463425eea535d6c5d5487e3d9ea044d955b9704e3081a8b6fea24f71277d0",
+      "after_sha256": "08caa660f24fb8f47bb8048e82f33564232425f11bf6d97aad709f4f415d2823",
+      "review": "comparacao do lock normaliza caminhos antigos antes da verificacao existente"
+    },
+    "scripts/prepare_qwen_remote.py": {
+      "path": "scripts/preparation/prepare_qwen_remote.py",
+      "before_sha256": "a259d1964428a5592663eb898cc2d8de20dc40b1cb8f0a5a8494344df8aae707",
+      "after_sha256": "6fd1d57bed961c8d0345f4358fefccf57c65fb28f9eaa05097b6cfd99a64e509",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/qwen_local_tokenizer.py": {
+      "path": "scripts/preparation/qwen_local_tokenizer.py",
+      "before_sha256": "1ea7ca099b1969f579339c52de27747c809220143000a1004a747974bafe1a72",
+      "after_sha256": "1ea7ca099b1969f579339c52de27747c809220143000a1004a747974bafe1a72",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/freeze_full_openrouter.py": {
+      "path": "scripts/preparation/freeze_full_openrouter.py",
+      "before_sha256": "802a14f2e9cf25265720727cac3adfe496e4107cd3851b74fea47a4e04781693",
+      "after_sha256": "62cc3be84a1267fae48bc3efe6314ed097af24456c0b7f111ee105e2326c3185",
+      "review": "coleta recursiva e manifesto de realocacao no lock"
+    },
+    "scripts/run_full_round.py": {
+      "path": "scripts/execution/run_full_round.py",
+      "before_sha256": "2b5809eabb63be9c78044ad86fb409c51c52f48e2f30bae95e7dc87b2e0600a1",
+      "after_sha256": "453d68afc5dfd421c565f4361d8c5289db097045296298e940875d665f6499c1",
+      "review": "subprocessos executam modulos qualificados com -m"
+    },
+    "scripts/run_ling_batches.py": {
+      "path": "scripts/execution/run_ling_batches.py",
+      "before_sha256": "d465a9bc543399e80003a37c1384127453d7c92ad50d0724ec0a0b48ee26c7b4",
+      "after_sha256": "ce820a2a975bb382d4f0fc286bd30d4c678419bc69c0c663b981d5f0d20f29ad",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/run_experiment_openrouter.py": {
+      "path": "scripts/execution/run_experiment_openrouter.py",
+      "before_sha256": "7bbe2c190b05466f444c0fd756b909f0643461aab6a899b5c8f6da78aa662618",
+      "after_sha256": "15bf000b9ba5b6a8f4ada8aa0ba6398bc119b9c8cf74e993976f843bfffb61c2",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/run_prepared_paid.py": {
+      "path": "scripts/execution/run_prepared_paid.py",
+      "before_sha256": "fbeaf0bcd18c6526ec65a50bc20e76e792551bd7118adb8d23a42464c58291d9",
+      "after_sha256": "82cc15fe0ca5899c6014bda67fdcc37416054fed59160f0d60aecb9844ec4c0f",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/run_paid_concurrent.py": {
+      "path": "scripts/execution/run_paid_concurrent.py",
+      "before_sha256": "70203c923b28ad988712ee1334c0f0b6c09b437367f6f259b2f7c809f77fcc9a",
+      "after_sha256": "52abc0f6146c94011d96bb22088c4d15feb2545f973a828edf3af7d3c2fc3253",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/update_progress_metrics.py": {
+      "path": "scripts/evaluation/update_progress_metrics.py",
+      "before_sha256": "0bd7eac8e10dc8c8e9280b755070ed8355cf30bc6778df75f657b587ebb780bd",
+      "after_sha256": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/extend_reference_metrics.py": {
+      "path": "scripts/evaluation/extend_reference_metrics.py",
+      "before_sha256": "b6c597b6ca3b7d1060c75d41d8d4c0654a484074ade0c6dbf789f9ae1271c029",
+      "after_sha256": "b6c597b6ca3b7d1060c75d41d8d4c0654a484074ade0c6dbf789f9ae1271c029",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/audit_example_metrics.py": {
+      "path": "scripts/evaluation/audit_example_metrics.py",
+      "before_sha256": "7c92b20683a4e16d8a93bdae0dcbaca50cef052dbacd9d634aa5d0ce4f2c7027",
+      "after_sha256": "96db9fb3df949ec9aae14c3f0d1c924c9b5ea0e4121037f73068a3538544895e",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/build_dev_review.py": {
+      "path": "scripts/reports/build_dev_review.py",
+      "before_sha256": "ee63e87a95d826b37791ab6c4288248d3a0f095ca60fa46c743e164ae5153b99",
+      "after_sha256": "e88d71dca0051f87d464ffd3a00513e13ec2a2e897ed69555a5c7a17ee0604d6",
+      "review": "template movido e saida em outputs/reports"
+    },
+    "scripts/build_example_guide.py": {
+      "path": "scripts/reports/build_example_guide.py",
+      "before_sha256": "dad9b3698c3b5059cccf1d7a813dd72af9b57d892db01cd1c39a3b10b830efc9",
+      "after_sha256": "d002be5692b64bcc7d1fd03251650a9d3724246810875f0eb6945033994c4c39",
+      "review": "template movido e saida em outputs/reports"
+    },
+    "scripts/build_pipeline_guide.py": {
+      "path": "scripts/reports/build_pipeline_guide.py",
+      "before_sha256": "e41f7e34bf1b2feb8a717fb60fe813b6582c82d85fc37a6e07e1ead7bc6b377f",
+      "after_sha256": "621f6c0c3632e68fabfff143923d00af1996609d53bcbe2d68520d3fd04697e2",
+      "review": "templates e saidas em scripts/reports e outputs/reports; fontes documentais atuais"
+    },
+    "scripts/export_paid_dev.py": {
+      "path": "scripts/reports/export_paid_dev.py",
+      "before_sha256": "024741f15234a725e0989111ae04c8b5ae07a60c3d57adb95b047addafc8db34",
+      "after_sha256": "2aa2105f93991dfb3f7f0fe3a511c0fc9684b6b39c1794b92a39a697ebd5140f",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/poc_openrouter.py": {
+      "path": "scripts/experiments/poc_openrouter.py",
+      "before_sha256": "9bfb888c2442aa745492f778de36b59077e6d1f8e41402d16995d045f3c85e48",
+      "after_sha256": "9bfb888c2442aa745492f778de36b59077e6d1f8e41402d16995d045f3c85e48",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/screen_openrouter.py": {
+      "path": "scripts/experiments/screen_openrouter.py",
+      "before_sha256": "c6bbc499b7c5d2077f848954cfd6b315b8ac6e0a92a00b81e9a472d6b7b25021",
+      "after_sha256": "bc5c208f4425d0cb6eb76d0b50f01c19e98ef0aa95704180891e42df21e1a5e5",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/replay_gemma_paid.py": {
+      "path": "scripts/experiments/replay_gemma_paid.py",
+      "before_sha256": "b1da460ec40bae326464ff80e5b21042c4477dfc171765f84328c959b4bed6d0",
+      "after_sha256": "439c7c7881cda191d2af55d27a3106ecf88e3d8087b34c43d1a1a34096830a16",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/run_example_trace.py": {
+      "path": "scripts/experiments/run_example_trace.py",
+      "before_sha256": "434d049829689841cccb973a9f6d442b8af03fa96f0d7c60096abe718721a1ec",
+      "after_sha256": "92deb35b2bdcf767f7dbd1d12b8506754ba6766677d21218c2ba2277f6565c1f",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/benchmark_paid_rates.py": {
+      "path": "scripts/experiments/benchmark_paid_rates.py",
+      "before_sha256": "57b6e2a6a1137876e1303d9ccf173e96fac66ccba7d0d0cd6aa57be4a7e5bdd1",
+      "after_sha256": "cccee57ba1532c0c0b6d6ec43d561b6e195d15c6b97fba07e07e4f4f4c2fa8fa",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/budget_full_openrouter.py": {
+      "path": "scripts/experiments/budget_full_openrouter.py",
+      "before_sha256": "7692cbbd4ed430278eb973f8b6017d25f749c104282189f3f28235eb392ee8d4",
+      "after_sha256": "7692cbbd4ed430278eb973f8b6017d25f749c104282189f3f28235eb392ee8d4",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "scripts/full_common.py": {
+      "path": "scripts/common/full_common.py",
+      "before_sha256": "5600548ea81210188540b4d9e05aa8e0f51ab51439a0ec224f21e4a720ba7d7f",
+      "after_sha256": "5600548ea81210188540b4d9e05aa8e0f51ab51439a0ec224f21e4a720ba7d7f",
+      "review": "AST equivalente apos normalizar imports/caminhos"
+    },
+    "src/findsum_rag/data.py": {
+      "path": "src/findsum_rag/data.py",
+      "before_sha256": "16fdbf3875365ab34798e520e12ca78ebe5a83094b1e8499d05c45d2ceabc10e",
+      "after_sha256": "b35324f0265ef9f71ed15aecc37865ef210744b76d7b831e8f6bc879293c8a04",
+      "review": "Somente referencias documentais/comandos em docstrings e mensagens de erro; logica preservada"
+    },
+    "src/findsum_rag/config.py": {
+      "path": "src/findsum_rag/config.py",
+      "before_sha256": "75d949ed7ec3ebaa92cdd01941a8cd6f2d2390c8e349a208102982d1fdacc7fa",
+      "after_sha256": "6bd476a824c0d7fb9f1772a2e2699418d6d7d7dd4b60011e7151660142b4098f",
+      "review": "Somente referencias documentais/comandos em docstrings e mensagens de erro; logica preservada"
+    },
+    "src/findsum_rag/splits.py": {
+      "path": "src/findsum_rag/splits.py",
+      "before_sha256": "81e7b4a9dd68f1091da97d5bf8aecf4ad2c036b6a924583c574f9ee701b5eb0d",
+      "after_sha256": "09e4bc5d1d86db2024fe87eceaca24009aa790cf60ca89f8a4e52c0131c5e95d",
+      "review": "Somente referencias documentais/comandos em docstrings e mensagens de erro; logica preservada"
+    }
+  },
+  "package_initializers": {
+    "scripts/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/data/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/preparation/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/execution/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/evaluation/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/reports/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/experiments/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
+    "scripts/common/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720"
+  }
+}

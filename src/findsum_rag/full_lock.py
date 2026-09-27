@@ -48,7 +48,35 @@ OPERATIONAL_COMPATIBILITY = {
     "scripts/benchmark_paid_rates.py",
     "scripts/run_paid_concurrent.py",
     "scripts/update_progress_metrics.py",
+    "configs/repository-layout.json",
 }
+
+
+def layout_files(files):
+    """Normaliza apenas as realocacoes e hashes explicitamente revisados.
+
+    Um hash antigo desconhecido nao e convertido. Assim, mudar a logica de
+    preparacao ou os insumos cientificos nao se torna compativel por renomear.
+    """
+    path = Path("configs/repository-layout.json")
+    if not path.exists():
+        return dict(files)
+    layout = json.loads(path.read_text())
+    moves = layout["moves"]
+    legacy = any(name in moves and moves[name]["path"] != name for name in files)
+    result = {}
+    for name, sha in files.items():
+        move = moves.get(name)
+        if move:
+            name = move["path"]
+            if sha == move["before_sha256"]:
+                sha = move["after_sha256"]
+        if name in result:
+            raise ValueError("lock contem caminhos antigos e novos para o mesmo modulo")
+        result[name] = sha
+    if legacy:
+        result.update(layout["package_initializers"])
+    return result
 
 
 def compatible_preparation(previous, current):
@@ -66,12 +94,14 @@ def compatible_preparation(previous, current):
     )
     if any(previous.get(k) != current.get(k) for k in scientific):
         return False
-    changed = {
-        name
-        for name in previous["files"].keys() | current["files"].keys()
-        if previous["files"].get(name) != current["files"].get(name)
-    }
-    return changed <= OPERATIONAL_COMPATIBILITY
+    before = layout_files(previous["files"])
+    after = layout_files(current["files"])
+    changed = {name for name in before.keys() | after.keys() if before.get(name) != after.get(name)}
+    operational = set(layout_files(dict.fromkeys(OPERATIONAL_COMPATIBILITY, "operational")))
+    # Novos __init__ sao permitidos somente com o hash revisado acima, nao por
+    # pertencerem a lista de scripts operacionais.
+    operational = {p for p in operational if not p.endswith("/__init__.py")}
+    return changed <= operational
 
 
 def verify_hashes_parallel(files, *, workers=4, label="arquivos"):

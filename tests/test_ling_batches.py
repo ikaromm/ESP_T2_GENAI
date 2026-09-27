@@ -13,8 +13,8 @@ from findsum_rag.cli import app
 
 @pytest.fixture
 def batcher(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("run_ling_batches")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.execution.run_ling_batches")
 
 
 def test_ten_batches_cover_same_thousand_once(batcher):
@@ -35,13 +35,13 @@ def test_cli_does_not_execute_by_default(monkeypatch):
     seen = []
     monkeypatch.setattr("findsum_rag.cli._script", lambda name, args: seen.append((name, args)))
     assert CliRunner().invoke(app, ["ling-batch"]).exit_code == 0
-    assert seen[0][0] == "run_ling_batches.py"
+    assert seen[0][0] == "scripts.execution.run_ling_batches"
     assert "--execute" not in seen[0][1]
     assert CliRunner().invoke(app, ["ling-batch", "--batch", "11"]).exit_code != 0
 
 
 def test_batch_resume_keeps_global_indices_and_no_duplicates(batcher, tmp_path):
-    core = importlib.import_module("run_prepared_paid")
+    core = importlib.import_module("scripts.execution.run_prepared_paid")
     rows = [
         {"doc_id": str(i // 6), "arm": batcher.ARMS[i % 6], "messages": [], "prompt_tokens": 100}
         for i in range(12)
@@ -78,7 +78,7 @@ def test_batch_resume_keeps_global_indices_and_no_duplicates(batcher, tmp_path):
 
 
 def test_transient_retry_circuit_can_resume_after_cooldown(batcher, tmp_path, monkeypatch):
-    core = importlib.import_module("run_prepared_paid")
+    core = importlib.import_module("scripts.execution.run_prepared_paid")
     rows = [{"doc_id": "a", "arm": "C1", "messages": [], "prompt_tokens": 100}]
     attempts = [
         {"case": 0, "doc_id": "a", "arm": "C1", "at": 100, "status": "http429", "reserved_usd": "0"}
@@ -134,7 +134,7 @@ def test_paid_cli_is_independent_and_dry_by_default(monkeypatch, command, model,
 
 @pytest.mark.parametrize("model", ["qwen37", "gemma26"])
 def test_paid_batch_resume_keeps_cumulative_budget(batcher, tmp_path, model):
-    core = importlib.import_module("run_prepared_paid")
+    core = importlib.import_module("scripts.execution.run_prepared_paid")
     target = core.TARGETS[model]
     rows = [{"doc_id": str(i), "arm": "C1", "messages": [], "prompt_tokens": 100} for i in range(2)]
     calls = []

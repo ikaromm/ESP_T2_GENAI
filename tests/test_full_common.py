@@ -9,8 +9,8 @@ import pytest
 
 @pytest.fixture
 def common(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("full_common")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.common.full_common")
 
 
 def test_random_selection_is_reproducible_and_preserves_full_membership(common):

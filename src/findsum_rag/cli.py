@@ -108,9 +108,7 @@ def _script(name: str, arguments: list[str]) -> None:
     import sys
 
     repo = Path(__file__).resolve().parents[2]
-    result = subprocess.run(
-        [sys.executable, "-u", str(repo / "scripts" / name), *arguments], cwd=repo
-    )
+    result = subprocess.run([sys.executable, "-u", "-m", name, *arguments], cwd=repo)
     if result.returncode:
         raise typer.Exit(result.returncode)
 
@@ -118,7 +116,7 @@ def _script(name: str, arguments: list[str]) -> None:
 @app.command("verify-full")
 def verify_full() -> None:
     """Confere o lock e as versoes; nenhuma chamada API."""
-    _script("freeze_full_openrouter.py", ["--verify"])
+    _script("scripts.preparation.freeze_full_openrouter", ["--verify"])
 
 
 @app.command()
@@ -131,7 +129,7 @@ def prepare(
     args = ["--output", str(output), "--config", str(config)]
     if full:
         args.append("--full")
-    _script("prepare_full_openrouter.py", args)
+    _script("scripts.preparation.prepare_full_openrouter", args)
 
 
 @app.command("ling-batch")
@@ -147,7 +145,7 @@ def ling_batch(
         args.extend(["--batch", str(batch)])
     if execute:
         args.append("--execute")
-    _script("run_ling_batches.py", args)
+    _script("scripts.execution.run_ling_batches", args)
 
 
 def _paid_batch(model, prepared, output, batch, budget_usd, execute):
@@ -165,7 +163,7 @@ def _paid_batch(model, prepared, output, batch, budget_usd, execute):
         args.extend(["--batch", str(batch)])
     if execute:
         args.append("--execute")
-    _script("run_ling_batches.py", args)
+    _script("scripts.execution.run_ling_batches", args)
 
 
 @app.command("qwen-batch")
@@ -198,7 +196,10 @@ def prepare_gemma(
     output: Path = typer.Option(Path("outputs/full-gemma-prepared")),
 ) -> None:
     """Preflight local do Gemma reutilizando fonte/RAG/exemplos congelados; sem API."""
-    _script("prepare_gemma_from_common.py", ["--source", str(source), "--output", str(output)])
+    _script(
+        "scripts.preparation.prepare_gemma_from_common",
+        ["--source", str(source), "--output", str(output)],
+    )
 
 
 @app.command()
@@ -215,7 +216,7 @@ def calibrate(
         args.append("--allow-eval")
     if execute:
         args.append("--execute")
-    _script("prepare_qwen_remote.py", args)
+    _script("scripts.preparation.prepare_qwen_remote", args)
 
 
 @app.command()
@@ -245,7 +246,7 @@ def run(
         args.append("--allow-eval")
     if execute:
         args.append("--execute")
-    _script("run_experiment_openrouter.py", args)
+    _script("scripts.execution.run_experiment_openrouter", args)
 
 
 @app.command()

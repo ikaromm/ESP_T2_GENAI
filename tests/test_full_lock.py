@@ -43,7 +43,7 @@ def test_cli_run_is_non_executing_by_default(monkeypatch):
         app, ["run", "--prepared", "a", "--qwen-prepared", "b", "--output", "c", "--allow-eval"]
     )
     assert result.exit_code == 0
-    assert seen[0][0] == "run_experiment_openrouter.py"
+    assert seen[0][0] == "scripts.execution.run_experiment_openrouter"
     assert "--execute" not in seen[0][1]
     assert "--config" not in seen[0][1]
 
@@ -54,13 +54,16 @@ def test_operational_upgrade_preserves_scientific_lock_only():
     from findsum_rag.full_lock import compatible_preparation
 
     previous = {
-        "files": {"scripts/run_ling_batches.py": "old", "src/findsum_rag/prompts.py": "fixed"},
+        "files": {
+            "scripts/execution/run_ling_batches.py": "old",
+            "src/findsum_rag/prompts.py": "fixed",
+        },
         "cohort": ["same"],
         "budgets_usd": {"qwen_generation": 18},
     }
     previous["lock_id"] = lock_digest(previous)
     current = deepcopy(previous)
-    current["files"]["scripts/run_ling_batches.py"] = "new"
+    current["files"]["scripts/execution/run_ling_batches.py"] = "new"
     current["files"]["src/findsum_rag/progress.py"] = "new"
     assert compatible_preparation(previous, current)
     current["files"]["src/findsum_rag/prompts.py"] = "different"

@@ -11,8 +11,8 @@ import pytest
 
 @pytest.fixture
 def benchmark(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("benchmark_paid_rates")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.experiments.benchmark_paid_rates")
 
 
 def state(tmp_path, benchmark, budget="1"):

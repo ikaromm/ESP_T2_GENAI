@@ -151,7 +151,7 @@ DEFAULT_ARMS: list[ExperimentArm] = [
 class DataConfig(BaseModel):
     """Escopo dos dados usados no experimento.
 
-    Os conjuntos vem de um manifesto congelado (`scripts/build_splits.py`), nao
+    Os conjuntos vem de um manifesto congelado (`scripts/data/build_splits.py`), nao
     dos splits originais do FINDSum: aqui nada e treinado, e o que se precisa e
     separar base de exemplos, desenvolvimento e avaliacao com empresa unica.
     """

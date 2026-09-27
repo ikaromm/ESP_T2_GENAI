@@ -12,9 +12,9 @@ import pytest
 
 @pytest.mark.parametrize("model", ["ling-free", "qwen37"])
 def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypatch, model):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    core = importlib.import_module("run_prepared_paid")
-    common = importlib.import_module("full_common")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    core = importlib.import_module("scripts.execution.run_prepared_paid")
+    common = importlib.import_module("scripts.common.full_common")
     from findsum_rag.full_lock import digest
 
     monkeypatch.chdir(tmp_path)
@@ -58,7 +58,7 @@ def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypat
         encode=encode,
     )
     monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *a, **k: tokenizer)
-    local = importlib.import_module("qwen_local_tokenizer")
+    local = importlib.import_module("scripts.preparation.qwen_local_tokenizer")
     monkeypatch.setattr(local, "load_qwen_tokenizer", lambda _: tokenizer)
     assert core.load_prepared(folder, model, 1, validation_workers=1) == rows
     threads.clear()

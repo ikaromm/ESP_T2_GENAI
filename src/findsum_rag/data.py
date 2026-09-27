@@ -1,6 +1,6 @@
 """Carga e remontagem do FINDSum.
 
-Formato dos arquivos distribuidos (verificado empiricamente, ver `docs/dataset.md`):
+Formato dos arquivos distribuidos (verificado empiricamente, ver `README.md`):
 
 * `text/FINDSum-<Task>/<task>_input_2000/<split>_<task>_segment_<i>_input_2_1000.csv`
   CSV com colunas `document,summary`. Existem N arquivos de segmento por split
@@ -297,7 +297,7 @@ def load_documents(
     if missing:
         listed = "\n  ".join(str(p) for p in missing)
         raise FileNotFoundError(
-            f"arquivos do FINDSum ausentes:\n  {listed}\nrode: python scripts/fetch_findsum.py"
+            f"arquivos do FINDSum ausentes:\n  {listed}\nrode: python -m scripts.data.fetch_findsum"
         )
 
     frames = [

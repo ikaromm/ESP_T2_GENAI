@@ -10,8 +10,8 @@ import pytest
 
 @pytest.fixture
 def runner(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("run_prepared_paid")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.execution.run_prepared_paid")
 
 
 def row(arm="C1"):

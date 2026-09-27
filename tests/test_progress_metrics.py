@@ -10,8 +10,8 @@ import pytest
 
 @pytest.fixture
 def metrics(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("update_progress_metrics")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.evaluation.update_progress_metrics")
 
 
 def states_for(metrics, tmp_path, count=2):
@@ -110,7 +110,7 @@ def test_empty_and_partial_cohort_exports_coverage_without_scoring(metrics, tmp_
 
 
 def test_cli_metrics_only_does_not_plan_or_generate(metrics, monkeypatch, tmp_path):
-    rounds = importlib.import_module("run_full_round")
+    rounds = importlib.import_module("scripts.execution.run_full_round")
     monkeypatch.setattr(rounds, "ROOT", tmp_path)
     monkeypatch.setattr(rounds, "verify_full_lock", lambda _: {"cohort": []})
     monkeypatch.setattr(rounds, "inspect_models", lambda _: ({}, {}))
@@ -128,7 +128,7 @@ def test_cli_metrics_only_does_not_plan_or_generate(metrics, monkeypatch, tmp_pa
 
 
 def test_cli_failed_round_updates_metrics_and_keeps_failure(metrics, monkeypatch, tmp_path):
-    rounds = importlib.import_module("run_full_round")
+    rounds = importlib.import_module("scripts.execution.run_full_round")
     monkeypatch.setattr(rounds, "ROOT", tmp_path)
     monkeypatch.setattr(rounds, "verify_full_lock", lambda _: {"cohort": []})
     monkeypatch.setattr(rounds, "inspect_models", lambda _: ({"ling-free": None}, {}))

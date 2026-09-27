@@ -21,7 +21,7 @@ SPLIT = "val"
 
 pytestmark = pytest.mark.skipif(
     bool(FindSumPaths(ROOT).missing(TASK, SPLIT)),
-    reason="FINDSum nao baixado; rode python scripts/fetch_findsum.py",
+    reason="FINDSum nao baixado; rode python -m scripts.data.fetch_findsum",
 )
 
 
@@ -108,7 +108,7 @@ def test_table_indices_are_document_global(documents):
                     overlapping += 1
     assert overlapping > 0, (
         "esperava indices de tabela repetidos entre segmentos; se isso mudou, "
-        "revise a documentacao do formato em docs/dataset.md"
+        "revise a documentacao do formato em README.md"
     )
 
 
@@ -129,7 +129,7 @@ def test_reference_summaries_are_not_fully_grounded(documents):
     numeric = baseline["reference_numeric_grounding_mean"]
     assert 0.3 < numeric < 0.9, (
         f"ancoragem numerica da referencia = {numeric:.3f}; se isso mudou muito, "
-        "revise a calibracao descrita em docs/dataset.md"
+        "revise a calibracao descrita em README.md"
     )
     # Resumos abstrativos: sobreposicao de 4-gramas baixa por construcao.
     ngram = baseline["reference_ngram_grounding_mean"]

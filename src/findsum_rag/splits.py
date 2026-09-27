@@ -133,7 +133,7 @@ def scan_pool(
         if missing:
             raise FileNotFoundError(
                 f"arquivos ausentes para {task.value}/{split}: {missing}; "
-                "rode python scripts/fetch_findsum.py"
+                "rode python -m scripts.data.fetch_findsum"
             )
         documents = load_documents(root, task, split)
         for document in documents:

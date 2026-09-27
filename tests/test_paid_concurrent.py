@@ -11,8 +11,8 @@ import pytest
 
 @pytest.fixture
 def core(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    m = importlib.import_module("run_paid_concurrent")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    m = importlib.import_module("scripts.execution.run_paid_concurrent")
     monkeypatch.setattr(m, "dispatch_delay", lambda *args: 0)
     return m
 

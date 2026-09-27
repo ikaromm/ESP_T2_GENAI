@@ -255,13 +255,13 @@
       }
     }
   },
-  "method_id": "1ae9b0c8b8de47f0c7adeaef86e69bba8f7c001e881526b19e9c40d302e1ea50",
+  "method_id": "f3e072d2d42469aba49045814d2938c46fbffd902651574d4bc42db858551acc",
   "method": {
     "src/findsum_rag/metrics.py": "a5d1901126a24111dae78826df63be2861c3eb9a065babf35b965d6bb2fb01c9",
-    "src/findsum_rag/data.py": "16fdbf3875365ab34798e520e12ca78ebe5a83094b1e8499d05c45d2ceabc10e",
+    "src/findsum_rag/data.py": "b35324f0265ef9f71ed15aecc37865ef210744b76d7b831e8f6bc879293c8a04",
     "src/findsum_rag/generate.py": "7cf0533e6036ec7d8dbeba68103ee8862272dd85d11028170d62ac7edff9bc4e",
     "uv.lock": "0ac99e72669d40ca98e4b6a9590c8f014b314b9779c11f8de5267a369dfe4428",
-    "scripts/update_progress_metrics.py": "0bd7eac8e10dc8c8e9280b755070ed8355cf30bc6778df75f657b587ebb780bd"
+    "scripts/evaluation/update_progress_metrics.py": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93"
   },
   "ledger_sha256": {
     "ling-free": "5dec7f4770b6878d3e06b3b97d30e289a8ad27d04c80c845dd509c9d5d6bd742",

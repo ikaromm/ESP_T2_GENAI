@@ -1,4 +1,4 @@
-# dados (FINDSum tem ~6.5 GB; baixe com scripts/fetch_findsum.py)
+# dados (FINDSum tem ~6.5 GB; baixe com python -m scripts.data.fetch_findsum)
 # `data/*` em vez de `data/` porque o git nao desce num diretorio ignorado:
 # sem isso as excecoes abaixo nao teriam efeito.
 data/*
@@ -51,3 +51,6 @@ coverage.xml
 .idea/
 .DS_Store
 *.swp
+
+# Relatorios HTML gerados ficam em outputs/reports, nao em docs.
+/docs/*.html

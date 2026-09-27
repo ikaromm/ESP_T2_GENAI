@@ -8,8 +8,8 @@ import pytest
 
 @pytest.fixture
 def core(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
-    return importlib.import_module("run_prepared_paid")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1]))
+    return importlib.import_module("scripts.execution.run_prepared_paid")
 
 
 @pytest.mark.parametrize(
@@ -55,6 +55,6 @@ def test_paid_window_allows_100_and_blocks_101_after_resume(core, tmp_path, caps
 
 
 def test_qwen_calibration_uses_paid_limit(core, tmp_path):
-    remote = importlib.import_module("prepare_qwen_remote")
+    remote = importlib.import_module("scripts.preparation.prepare_qwen_remote")
     counter = remote.RemoteCounter(tmp_path, core.money(18), None)
     assert counter.limiter.limit == 100
