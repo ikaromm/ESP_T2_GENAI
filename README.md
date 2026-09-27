@@ -2,6 +2,10 @@
 
 Projeto de pesquisa de pós-graduação que compara recuperação de contexto e seleção de exemplos na sumarização de relatórios financeiros do **FINDSum Liquidity**. A geração usa exclusivamente a API do **OpenRouter**. Preparação, embeddings, FAISS e métricas são executados localmente.
 
+## Resultados parciais dos primeiros 100 documentos
+
+Os três modelos concluíram os mesmos 100 documentos × seis braços, totalizando 1.800 respostas. A [matriz e interpretação das métricas](docs/metricas-primeiros100-20260927.md) e os [resultados por documento](results/first100-20260927/) estão versionados. C1 liderou as médias de BERTScore F1, ROUGE-L e METEOR em cada modelo; C2 superou C1t, mas ficou abaixo de C1. São resultados descritivos parciais, sem testes de significância ou confirmação de hipóteses. Este registro atualiza a situação da geração para este lote; o restante da coorte continua pendente.
+
 ## Estado verificado em 27/09/2026
 
 | Etapa | Estado |
