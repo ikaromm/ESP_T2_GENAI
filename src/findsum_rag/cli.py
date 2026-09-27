@@ -43,7 +43,7 @@ def inspect(
 
 @app.command("init-config")
 def init_config(
-    path: Path = typer.Option(Path("configs/experiment.yaml"), help="destino"),
+    path: Path = typer.Option(Path("configs/dev_openrouter.yaml"), help="destino"),
     force: bool = typer.Option(False, "--force", help="sobrescreve se existir"),
 ) -> None:
     """Grava um arquivo de configuracao com os valores padrao."""
@@ -102,35 +102,163 @@ def arms() -> None:
         )
 
 
+def _script(name: str, arguments: list[str]) -> None:
+    """Executa os scripts do checkout instalado, sem interpolacao de shell."""
+    import subprocess
+    import sys
+
+    repo = Path(__file__).resolve().parents[2]
+    result = subprocess.run([sys.executable, str(repo / "scripts" / name), *arguments], cwd=repo)
+    if result.returncode:
+        raise typer.Exit(result.returncode)
+
+
+@app.command("verify-full")
+def verify_full() -> None:
+    """Confere o lock e as versoes; nenhuma chamada API."""
+    _script("freeze_full_openrouter.py", ["--verify"])
+
+
+@app.command()
+def prepare(
+    output: Path = typer.Option(...),
+    config: Path = typer.Option(Path("configs/full_openrouter.yaml")),
+    full: bool = typer.Option(True, "--full/--dev"),
+) -> None:
+    """Prepara fonte, RAG, few-shot e tokenizers locais; nao gera resumos."""
+    args = ["--output", str(output), "--config", str(config)]
+    if full:
+        args.append("--full")
+    _script("prepare_full_openrouter.py", args)
+
+
+@app.command("ling-batch")
+def ling_batch(
+    prepared: Path = typer.Option(Path("outputs/full-ling-prepared")),
+    output: Path = typer.Option(Path("outputs/full-ling-batches")),
+    batch: int | None = typer.Option(None, min=1, max=10),
+    execute: bool = typer.Option(False, "--execute"),
+) -> None:
+    """Ling gratuito: valida 1000 casos e executa/retoma um lote fixo de 100."""
+    args = ["--prepared", str(prepared), "--output", str(output)]
+    if batch is not None:
+        args.extend(["--batch", str(batch)])
+    if execute:
+        args.append("--execute")
+    _script("run_ling_batches.py", args)
+
+
+@app.command()
+def calibrate(
+    prepared: Path = typer.Option(...),
+    output: Path = typer.Option(...),
+    budget_usd: float = typer.Option(18.0, min=0.0),
+    allow_eval: bool = typer.Option(False, "--allow-eval"),
+    execute: bool = typer.Option(False, "--execute"),
+) -> None:
+    """Sondas Qwen PAGAS somente com --execute; nao sao resumos do experimento."""
+    args = ["--prepared", str(prepared), "--output", str(output), "--budget-usd", str(budget_usd)]
+    if allow_eval:
+        args.append("--allow-eval")
+    if execute:
+        args.append("--execute")
+    _script("prepare_qwen_remote.py", args)
+
+
 @app.command()
 def run(
-    config: Path = typer.Option(..., help="arquivo YAML de configuracao"),
-    arm: list[str] = typer.Option(None, "--arm", help="rodar apenas estas configuracoes"),
-    no_bertscore: bool = typer.Option(False, "--no-bertscore", help="pula o BERTScore"),
+    prepared: Path = typer.Option(...),
+    qwen_prepared: Path = typer.Option(...),
+    output: Path = typer.Option(...),
+    qwen_budget: float = typer.Option(18.0, min=0.0),
+    gemma_budget: float = typer.Option(9.0, min=0.0),
+    allow_eval: bool = typer.Option(False, "--allow-eval"),
+    execute: bool = typer.Option(False, "--execute"),
 ) -> None:
-    """Executa a rodada experimental."""
-    from .pipeline import run_experiment
-
-    cfg = ExperimentConfig.from_yaml(config)
-    results = run_experiment(cfg, arms=arm or None, with_bertscore=not no_bertscore)
-    typer.echo(json.dumps({k: v.summary for k, v in results.items()}, indent=2))
+    """Unico executor principal: OpenRouter, tres modelos, seis bracos e retomada."""
+    args = [
+        "--prepared",
+        str(prepared),
+        "--qwen-prepared",
+        str(qwen_prepared),
+        "--output",
+        str(output),
+        "--qwen-budget",
+        str(qwen_budget),
+        "--gemma-budget",
+        str(gemma_budget),
+    ]
+    if allow_eval:
+        args.append("--allow-eval")
+    if execute:
+        args.append("--execute")
+    _script("run_experiment_openrouter.py", args)
 
 
 @app.command()
 def compare(
     run_dir: Path = typer.Option(..., help="diretorio de uma rodada, ex: outputs/baseline-run"),
-    reference: str = typer.Option("C5", help="configuracao de referencia da comparacao"),
+    reference: str | None = typer.Option(None, help="contraste exploratorio contra este braco"),
     alpha: float = typer.Option(0.05, help="nivel de significancia"),
 ) -> None:
     """Compara estatisticamente as configuracoes de uma rodada."""
-    from .analyze import compare_against, format_table, load_run
+    from dataclasses import asdict
+
+    from .analyze import ANALYSIS_PLAN, compare_against, compare_hypotheses, format_table, load_run
 
     scores = load_run(run_dir)
     if not scores:
         typer.echo(f"nenhum scores.csv encontrado em {run_dir}")
         raise typer.Exit(code=1)
     typer.echo(f"configuracoes encontradas: {', '.join(sorted(scores))}\n")
-    typer.echo(format_table(compare_against(scores, reference), alpha=alpha))
+    if reference:
+        comparisons = compare_against(scores, reference)
+        typer.echo("Analise exploratoria; nao substitui H1--H4.")
+    else:
+        plan_path = run_dir / "analysis_plan.json"
+        if not plan_path.exists() or json.loads(plan_path.read_text()) != json.loads(
+            json.dumps(ANALYSIS_PLAN)
+        ):
+            raise typer.BadParameter("plano predefinido ausente ou diferente nesta rodada")
+        try:
+            comparisons = compare_hypotheses(scores)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        typer.echo("H1 C2/C1; H1b C2/C1t; H2 C3/C2; H3 C4/C3; H4 C5/C4.")
+        typer.echo("H3: ausencia de significancia nao demonstra equivalencia.")
+    filename = "exploratory_comparisons.json" if reference else "comparisons.json"
+    (run_dir / filename).write_text(json.dumps([asdict(c) for c in comparisons], indent=2))
+    typer.echo(format_table(comparisons, alpha=alpha))
+
+
+@app.command("review-export")
+def review_export(run_dir: Path = typer.Option(...), output: Path = typer.Option(...)) -> None:
+    """Exporta resumos/evidencias para revisao humana de afirmacoes."""
+    from .factual import export_review
+
+    export_review(run_dir, output)
+    typer.echo(f"Revisao: {output}; mantenha o mapa separado do revisor.")
+
+
+@app.command("review-score")
+def review_score(review: Path = typer.Option(...), output: Path = typer.Option(...)) -> None:
+    """Pontua apenas revisoes completas; nao automatiza o julgamento factual."""
+    from .factual import evidence_digest, score_review
+
+    cases = json.loads(review.read_text())
+    mapping = json.loads(review.with_suffix(".map.json").read_text())
+    results = score_review(cases)
+    if {row["case_id"] for row in results} != set(mapping):
+        raise typer.BadParameter("revisao deve cobrir todos os casos exportados")
+    for case in cases:
+        if evidence_digest(case) != mapping[case["case_id"]]["evidence_sha256"]:
+            raise typer.BadParameter("resumo ou evidencias foram alterados durante a revisao")
+    for row in results:
+        row.update(mapping[row["case_id"]])
+    if output.exists():
+        raise typer.BadParameter("arquivo de saida ja existe")
+    output.write_text(json.dumps(results, ensure_ascii=False, indent=2))
+    typer.echo(f"Escores factuais revisados: {output}")
 
 
 if __name__ == "__main__":

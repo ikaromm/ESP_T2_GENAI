@@ -1,0 +1,48 @@
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from findsum_rag.cli import app
+from findsum_rag.full_lock import digest, lock_digest, verify_full_lock
+
+
+def test_full_lock_rejects_changed_source_before_execution(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    source = Path("prompt.txt")
+    source.write_text("original")
+    lock = {
+        "files": {"prompt.txt": digest(source)},
+        "dataset_files": {},
+        "versions": {},
+        "hf_assets": {},
+    }
+    lock["lock_id"] = lock_digest(lock)
+    Path("lock.json").write_text(json.dumps(lock))
+    assert verify_full_lock("lock.json")["lock_id"] == lock["lock_id"]
+    source.write_text("changed")
+    with pytest.raises(ValueError, match="congelado"):
+        verify_full_lock("lock.json")
+
+
+def test_full_lock_rejects_edited_manifest(tmp_path):
+    data = {"files": {}, "dataset_files": {}, "versions": {}, "hf_assets": {}}
+    data["lock_id"] = lock_digest(data)
+    data["versions"]["torch"] = "not-the-frozen-version"
+    path = tmp_path / "lock.json"
+    path.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="identificador"):
+        verify_full_lock(path)
+
+
+def test_cli_run_is_non_executing_by_default(monkeypatch):
+    seen = []
+    monkeypatch.setattr("findsum_rag.cli._script", lambda name, args: seen.append((name, args)))
+    result = CliRunner().invoke(
+        app, ["run", "--prepared", "a", "--qwen-prepared", "b", "--output", "c", "--allow-eval"]
+    )
+    assert result.exit_code == 0
+    assert seen[0][0] == "run_experiment_openrouter.py"
+    assert "--execute" not in seen[0][1]
+    assert "--config" not in seen[0][1]

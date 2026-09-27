@@ -1,15 +1,4 @@
-"""Comparacao estatistica entre configuracoes.
-
-O plano de pesquisa prevê verificar se as diferencas entre configuracoes sao
-reais ou ruido. Como todas as configuracoes rodam sobre OS MESMOS documentos, as
-amostras sao **emparelhadas**, e o teste adequado e o de Wilcoxon para postos
-sinalizados: nao assume normalidade das distribuicoes de ROUGE/BERTScore, que
-sao limitadas em [0, 1] e tipicamente assimetricas.
-
-Com 5 configuracoes ha 10 pares possiveis por metrica. Testar todos infla o erro
-tipo I, por isso as comparacoes sao feitas contra uma configuracao de referencia
-(por padrao C5, a proposta) e o p-valor recebe correcao de Holm-Bonferroni.
-"""
+"""Comparacoes emparelhadas predefinidas; contraste exploratorio opcional."""
 
 from __future__ import annotations
 
@@ -22,10 +11,6 @@ COMPARISON_METRICS = (
     "rouge2",
     "rougeL",
     "bertscore",
-    "numeric_f1",
-    "numeric_recall",
-    "numeric_grounding",
-    "ngram_grounding",
 )
 
 
@@ -44,6 +29,7 @@ class PairedComparison:
     p_value: float
     p_adjusted: float | None = None
     effect_size: float | None = None
+    hypothesis: str | None = None
 
     @property
     def favours(self) -> str:
@@ -66,6 +52,8 @@ def load_scores(path: Path | str) -> dict[str, dict[str, float]]:
     with Path(path).open(encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
             doc_id = row.pop("doc_id")
+            if doc_id in rows:
+                raise ValueError(f"doc_id duplicado: {doc_id}")
             values: dict[str, float] = {}
             for key, raw in row.items():
                 if raw in ("", None):
@@ -134,8 +122,7 @@ def compare_pair(
     result = wilcoxon(xs, ys, zero_method="wilcox", alternative="two-sided")
 
     # Tamanho de efeito nao parametrico: proporcao de documentos em que A supera
-    # B, descontados os empates (equivalente a A comum de Vargha-Delaney para
-    # amostras emparelhadas).
+    # B, descontados os empates. Taxa descritiva de vitorias, nao Vargha-Delaney.
     wins = sum(1 for d in deltas if d > 0)
     losses = sum(1 for d in deltas if d < 0)
     effect = wins / (wins + losses) if (wins + losses) else None
@@ -183,8 +170,7 @@ def compare_against(
     """
     if reference not in scores:
         raise KeyError(
-            f"configuracao de referencia {reference!r} ausente; "
-            f"disponiveis: {sorted(scores)}"
+            f"configuracao de referencia {reference!r} ausente; disponiveis: {sorted(scores)}"
         )
 
     comparisons: list[PairedComparison] = []
@@ -218,3 +204,63 @@ def format_table(comparisons: list[PairedComparison], *, alpha: float = 0.05) ->
             f"{'sim' if c.significant(alpha) else 'nao'}"
         )
     return "\n".join(lines)
+
+
+HYPOTHESES = (
+    ("H1", "C2", "C1"),
+    ("H1b", "C2", "C1t"),
+    ("H2", "C3", "C2"),
+    ("H3", "C4", "C3"),
+    ("H4", "C5", "C4"),
+)
+PRIMARY_METRICS = ("bertscore", "rougeL")
+ANALYSIS_PLAN = {
+    "version": 3,
+    "bertscore_model": "xlnet-base-cased",
+    "bertscore_truncation": "reject",
+    "scope": "reference_similarity_only",
+    "descriptive_metrics": ("rouge1", "rouge2"),
+    "hypotheses": HYPOTHESES,
+    "primary_metrics": PRIMARY_METRICS,
+    "correction": "Holm over all 10 tests",
+    "test": "paired two-sided Wilcoxon",
+    "H3": "sensitivity control; non-significance does not establish equivalence",
+}
+
+
+def compare_hypotheses(scores) -> list[PairedComparison]:
+    """Familia predefinida completa; falhas e ausencias nao reduzem a familia."""
+    import math
+    import statistics
+
+    expected = {arm for _, a, b in HYPOTHESES for arm in (a, b)}
+    if not expected <= scores.keys():
+        raise ValueError(f"configuracoes ausentes: {sorted(expected - scores.keys())}")
+    doc_ids = set(scores["C1"])
+    if len(doc_ids) < 2:
+        raise ValueError("pelo menos dois documentos emparelhados sao necessarios")
+    for arm in sorted(expected):
+        if set(scores[arm]) != doc_ids:
+            raise ValueError(
+                f"{arm}: documentos diferentes de C1; nao excluir pares silenciosamente"
+            )
+        for doc_id in sorted(doc_ids):
+            for metric in PRIMARY_METRICS:
+                if metric not in scores[arm][doc_id] or not math.isfinite(
+                    scores[arm][doc_id][metric]
+                ):
+                    raise ValueError(
+                        f"{arm}/{doc_id}: metrica primaria ausente ou invalida: {metric}"
+                    )
+    comparisons = []
+    for hypothesis, a, b in HYPOTHESES:
+        for metric in PRIMARY_METRICS:
+            result = compare_pair(a, b, scores[a], scores[b], metric)
+            if result is None:
+                xs, ys = paired_values(scores[a], scores[b], metric)
+                result = PairedComparison(
+                    metric, a, b, len(xs), statistics.fmean(xs), statistics.fmean(ys), 0.0, 0.0, 1.0
+                )
+            result.hypothesis = hypothesis
+            comparisons.append(result)
+    return holm_bonferroni(comparisons)

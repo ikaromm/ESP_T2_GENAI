@@ -1,22 +1,9 @@
-"""Metricas de avaliacao nas tres dimensoes do estudo.
+"""Similaridade textual, coincidencia numerica e extratividade.
 
-* **Qualidade textual** -- ROUGE-1/2/L e BERTScore contra o resumo de referencia.
-* **Preservacao numerica** -- precisao, cobertura e F1 dos numeros do resumo
-  gerado em relacao ao resumo de referencia.
-* **Fidelidade factual** -- ancoragem dos numeros do resumo gerado no documento
-  de origem. Um numero que nao esta no documento e alucinacao, independentemente
-  de estar ou nao na referencia.
-* **Extratividade** -- sobreposicao de n-gramas com o documento. Nao e fidelidade:
-  serve para detectar colagem e deve ser lida contra o valor da propria
-  referencia (ver `reference_baseline`).
-
-A distincao entre as duas primeiras comparacoes e deliberada: comparar com a
-referencia mede se o resumo cobre o que deveria; comparar com o documento mede se
-o resumo inventa. Um resumo pode ir bem em uma e mal na outra.
-
-Todas as metricas de ancoragem precisam de calibracao. Nos dados reais o proprio
-resumo de referencia marca `numeric_grounding` ~0.56 e `ngram_grounding` ~0.12
-contra o texto distribuido, e sao esses os patamares de comparacao -- nao 1.0.
+Coincidencia de valores nao avalia entidade, periodo ou relacao contabil.
+Mesmo numeros trocados entre receita e lucro podem obter escore 1.
+Avaliacao factual exige revisao de afirmacoes e evidencias (modulo factual).
+Patamares da referencia sao diagnosticos da fonte, nunca tetos de desempenho.
 """
 
 from __future__ import annotations
@@ -115,11 +102,7 @@ class PRF:
     def from_counts(cls, matched: int, predicted: int, expected: int) -> PRF:
         precision = matched / predicted if predicted else 0.0
         recall = matched / expected if expected else 0.0
-        f1 = (
-            2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0
-            else 0.0
-        )
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
         return cls(precision=precision, recall=recall, f1=f1)
 
 
@@ -159,18 +142,7 @@ def _ngrams(tokens: list[str], n: int) -> Counter:
 
 
 def ngram_grounding(prediction: str, source: str, n: int = 4) -> float:
-    """Fracao dos n-gramas do resumo que aparecem no documento de origem.
-
-    **Isto mede extratividade, nao fidelidade.** Medido nos dados reais, o
-    proprio resumo de referencia do FINDSum marca ~0.12 (tarefa Liquidity, split
-    val), porque os resumos sao abstrativos: foram escritos, nao copiados. Um
-    modelo que marcasse 0.9 aqui estaria colando trechos, o que e pior e nao
-    melhor.
-
-    Portanto interprete sempre contra o valor da referencia, dado por
-    `reference_baseline()`: o que interessa e a PROXIMIDADE ao nivel de
-    extratividade da referencia, nao o valor absoluto.
-    """
+    """Fracao de n-gramas copiados da fonte; extratividade, nao qualidade."""
     pred = _ngrams(_tokens(prediction), n)
     total = sum(pred.values())
     if not total:
@@ -182,17 +154,11 @@ def ngram_grounding(prediction: str, source: str, n: int = 4) -> float:
 def reference_baseline(
     references: list[str], sources: list[str], *, tolerance: float = 1e-3
 ) -> dict[str, float]:
-    """Calibra as metricas de ancoragem usando os proprios resumos de referencia.
+    """Diagnostico das referencias contra a fonte disponivel, nao teto.
 
-    Sem esta calibracao as metricas de ancoragem sao ininterpretaveis. Nos dados
-    reais a referencia marca `numeric_grounding` ~0.56, ou seja **~44% dos
-    numeros do resumo humano nao estao no texto distribuido** -- consequencia da
-    selecao de conteudo aplicada pelo FINDSum (ver `docs/dataset.md`). Isso
-    estabelece um teto pratico: nenhum modelo que use so este texto como fonte
-    deveria ser cobrado de ultrapassar esse patamar.
-
-    Raises:
-        ValueError: se as listas tiverem tamanhos diferentes.
+    O maximo matematico de numeric_grounding continua sendo 1. Uma referencia
+    pode incluir fatos ausentes da fonte distribuida. Extratividade nao tem
+    direcao normativa: proximidade da referencia nao prova melhor qualidade.
     """
     if len(references) != len(sources):
         raise ValueError(f"{len(references)} referencias para {len(sources)} documentos")
@@ -232,9 +198,7 @@ class RougeScorer:
     def __init__(self) -> None:
         from rouge_score import rouge_scorer
 
-        self._scorer = rouge_scorer.RougeScorer(
-            ["rouge1", "rouge2", "rougeL"], use_stemmer=True
-        )
+        self._scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
 
     def score(self, prediction: str, reference: str) -> RougeScores:
         result = self._scorer.score(reference, prediction)
@@ -245,29 +209,120 @@ class RougeScorer:
         )
 
 
-def bertscore(
+BERTSCORE_MODEL = "xlnet-base-cased"
+
+
+def _audit_bert_tokenizer(texts, tokenizer):
+    from bert_score.utils import sent_encode
+    from transformers import GPT2Tokenizer, RobertaTokenizer
+
+    extra = (
+        {"add_prefix_space": True}
+        if isinstance(tokenizer, (GPT2Tokenizer, RobertaTokenizer))
+        else {}
+    )
+    encoded = {
+        text: tokenizer.encode(text.strip(), add_special_tokens=True, truncation=False, **extra)
+        for text in dict.fromkeys(texts)
+    }
+    # XLNet usa posicoes relativas e um sentinela ~1e30 no tokenizer. Em
+    # transformers 5, esse sentinela excede o inteiro do backend. O limite
+    # operacional e o MAIOR texto real, nao um corte predefinido da avaliacao.
+    if tokenizer.model_max_length > 1_000_000_000:
+        tokenizer.model_max_length = max((len(ids) for ids in encoded.values()), default=8)
+    cache = {}
+    for text, full in encoded.items():
+        used = sent_encode(tokenizer, text)
+        if full != used:
+            raise ValueError(f"BERTScore truncaria/alteraria entrada: {len(full)} -> {len(used)}")
+        cache[text] = {"full_tokens": len(full), "evaluated_tokens": len(used), "truncated": False}
+    return [cache[text] for text in texts]
+
+
+def bertscore_token_audit(texts: list[str], model_type: str = BERTSCORE_MODEL) -> list[dict]:
+    """Confere os IDs integrais contra o tokenizer realmente usado pelo BERTScore."""
+    from bert_score.utils import get_tokenizer
+
+    return _audit_bert_tokenizer(texts, get_tokenizer(model_type, use_fast=False))
+
+
+def bertscore_components(
     predictions: list[str],
     references: list[str],
     *,
-    model_type: str = "roberta-large",
-    batch_size: int = 16,
+    model_type: str = BERTSCORE_MODEL,
+    batch_size: int = 1,
     device: str | None = None,
-) -> list[float]:
-    """BERTScore F1 por par. Calculado em lote por ser custoso em GPU."""
+) -> list[PRF]:
+    """Precisao, recall e F1 integrais; rejeita qualquer corte de tokens."""
+    if len(predictions) != len(references):
+        raise ValueError("predicoes e referencias devem ter o mesmo tamanho")
     if not predictions:
         return []
-    from bert_score import score as bert_score_fn
+    from bert_score import BERTScorer
 
-    _, _, f1 = bert_score_fn(
-        predictions,
-        references,
+    scorer = BERTScorer(
         model_type=model_type,
         batch_size=batch_size,
         device=device,
-        verbose=False,
         rescale_with_baseline=False,
+        use_fast_tokenizer=False,
     )
-    return [float(v) for v in f1]
+    _audit_bert_tokenizer(predictions + references, scorer._tokenizer)
+    precision, recall, f1 = scorer.score(
+        predictions, references, batch_size=batch_size, verbose=False
+    )
+    return [
+        PRF(float(p), float(r), float(f)) for p, r, f in zip(precision, recall, f1, strict=True)
+    ]
+
+
+def bertscore(predictions, references, **kwargs) -> list[float]:
+    """API historica de F1; mesma avaliacao integral dos componentes."""
+    return [s.f1 for s in bertscore_components(predictions, references, **kwargs)]
+
+
+def ensure_meteor_resources():
+    """Falha explicita sem WordNet; nao baixa recursos durante a avaliacao."""
+    from nltk.corpus import wordnet
+
+    wordnet.ensure_loaded()
+
+
+def meteor(prediction: str, reference: str) -> float:
+    """METEOR NLTK, Treebank, lowercase, Porter/WordNet e parametros padrao."""
+    from nltk.tokenize import TreebankWordTokenizer
+    from nltk.translate.meteor_score import single_meteor_score
+
+    ensure_meteor_resources()
+    tokenizer = TreebankWordTokenizer()
+    return float(
+        single_meteor_score(
+            tokenizer.tokenize(reference.lower()),
+            tokenizer.tokenize(prediction.lower()),
+            alpha=0.9,
+            beta=3.0,
+            gamma=0.5,
+        )
+    )
+
+
+SUPPLEMENTARY_METRICS = {
+    "version": 1,
+    "scope": "descriptive_only_not_added_to_primary_hypothesis_tests",
+    "metrics": ["bertscore_precision", "bertscore_recall", "meteor"],
+    "bertscore": {"model": BERTSCORE_MODEL, "layer": 5, "idf": False, "rescale": False},
+    "meteor": {
+        "implementation": "nltk.translate.meteor_score.single_meteor_score",
+        "tokenizer": "TreebankWordTokenizer",
+        "lowercase": True,
+        "stemmer": "PorterStemmer",
+        "synonyms": "WordNet English",
+        "alpha": 0.9,
+        "beta": 3.0,
+        "gamma": 0.5,
+    },
+}
 
 
 @dataclass
@@ -276,28 +331,33 @@ class DocumentScores:
 
     doc_id: str
     rouge: RougeScores
-    numeric: PRF
-    numeric_grounding: float
-    ngram_grounding: float
     n_words: int
+    numeric: PRF | None = None
+    numeric_grounding: float | None = None
+    ngram_grounding: float | None = None
     bertscore: float | None = None
     extra: dict = field(default_factory=dict)
 
     def flat(self) -> dict[str, float | str | None]:
         """Formato tabular, para agregacao e gravacao em CSV."""
-        return {
+        row = {
             "doc_id": self.doc_id,
             "rouge1": self.rouge.rouge1,
             "rouge2": self.rouge.rouge2,
             "rougeL": self.rouge.rougeL,
             "bertscore": self.bertscore,
-            "numeric_precision": self.numeric.precision,
-            "numeric_recall": self.numeric.recall,
-            "numeric_f1": self.numeric.f1,
-            "numeric_grounding": self.numeric_grounding,
-            "ngram_grounding": self.ngram_grounding,
             "n_words": self.n_words,
+            **self.extra,
         }
+        if self.numeric is not None:
+            row.update(
+                numeric_precision=self.numeric.precision,
+                numeric_recall=self.numeric.recall,
+                numeric_f1=self.numeric.f1,
+                numeric_grounding=self.numeric_grounding,
+                ngram_grounding=self.ngram_grounding,
+            )
+        return row
 
 
 def score_document(
@@ -307,8 +367,9 @@ def score_document(
     source: str,
     *,
     rouge: RougeScorer | None = None,
+    legacy_diagnostics: bool = False,
 ) -> DocumentScores:
-    """Calcula todas as metricas deterministicas de um resumo.
+    """Calcula ROUGE; diagnosticos numericos legados exigem opt-in explicito.
 
     BERTScore fica de fora porque compensa rodar em lote; use `bertscore()` e
     preencha o campo depois.
@@ -317,9 +378,9 @@ def score_document(
     return DocumentScores(
         doc_id=doc_id,
         rouge=scorer.score(prediction, reference),
-        numeric=numeric_prf(prediction, reference),
-        numeric_grounding=numeric_grounding(prediction, source),
-        ngram_grounding=ngram_grounding(prediction, source),
+        numeric=numeric_prf(prediction, reference) if legacy_diagnostics else None,
+        numeric_grounding=numeric_grounding(prediction, source) if legacy_diagnostics else None,
+        ngram_grounding=ngram_grounding(prediction, source) if legacy_diagnostics else None,
         n_words=len(prediction.split()),
     )
 

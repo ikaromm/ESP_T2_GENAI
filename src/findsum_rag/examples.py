@@ -31,8 +31,10 @@ class Example:
     document: str
     summary: str
 
-    def truncated(self, max_words: int) -> Example:
+    def truncated(self, max_words: int | None) -> Example:
         """Versao com o documento limitado a `max_words` palavras."""
+        if max_words is None:
+            return self
         words = self.document.split()
         if len(words) <= max_words:
             return self
@@ -46,14 +48,9 @@ class ExampleStore:
         self.examples = examples
         self._index: VectorIndex | None = None
 
-    def build_index(self, encoder: Encoder, *, query_words: int = 400) -> None:
-        """Indexa os exemplos para a selecao dinamica.
-
-        Apenas as primeiras `query_words` palavras de cada documento sao
-        codificadas: os codificadores de sentenca truncam entradas longas, logo
-        alimentar o documento inteiro daria a ilusao de usar todo o conteudo.
-        """
-        texts = [" ".join(e.document.split()[:query_words]) for e in self.examples]
+    def build_index(self, encoder: Encoder) -> None:
+        """Indexa documentos completos; o encoder cobre todas as janelas."""
+        texts = [e.document for e in self.examples]
         self._index = build_index(encoder, texts, list(self.examples))
 
     @property

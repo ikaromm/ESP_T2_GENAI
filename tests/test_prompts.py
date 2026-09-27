@@ -39,9 +39,7 @@ def test_system_prompt_is_identical_across_arms():
 
 def test_task_instruction_present_in_every_arm():
     for a in DEFAULT_ARMS:
-        prompt = build_prompt(
-            task=Task.LIQUIDITY, arm=a, context_chunks=CHUNKS, examples=[]
-        )
+        prompt = build_prompt(task=Task.LIQUIDITY, arm=a, context_chunks=CHUNKS, examples=[])
         assert TASK_INSTRUCTIONS[Task.LIQUIDITY] in prompt.user
 
 
@@ -52,18 +50,14 @@ def test_roo_and_liquidity_use_different_instructions():
 
 
 def test_context_chunks_are_numbered():
-    prompt = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[]
-    )
+    prompt = build_prompt(task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[])
     assert "[1] cash flow was $ 50.0 million" in prompt.user
     assert "[2] debt was $ 12.5 million" in prompt.user
     assert prompt.n_context_chunks == 2
 
 
 def test_no_example_block_when_no_examples():
-    prompt = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C1"), context_chunks=CHUNKS, examples=[]
-    )
+    prompt = build_prompt(task=Task.LIQUIDITY, arm=arm("C1"), context_chunks=CHUNKS, examples=[])
     assert "### Example" not in prompt.user
     assert prompt.n_examples == 0
 
@@ -83,28 +77,30 @@ def test_example_block_present_and_truncated():
     assert prompt.n_examples == 1
 
 
-def test_context_label_signals_rag():
-    with_rag = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[]
-    )
-    without = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C1"), context_chunks=CHUNKS, examples=[]
-    )
-    assert "retrieved for this report" in with_rag.user
-    assert "retrieved for this report" not in without.user
+def test_context_label_does_not_confounds_rag():
+    with_rag = build_prompt(task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[])
+    without = build_prompt(task=Task.LIQUIDITY, arm=arm("C1"), context_chunks=CHUNKS, examples=[])
+    assert with_rag.as_messages() == without.as_messages()
 
 
 def test_messages_format():
-    prompt = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[]
-    )
+    prompt = build_prompt(task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[])
     messages = prompt.as_messages()
     assert [m["role"] for m in messages] == ["system", "user"]
     assert messages[0]["content"] == SYSTEM_PROMPT
 
 
 def test_context_words_counted():
-    prompt = build_prompt(
-        task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[]
-    )
+    prompt = build_prompt(task=Task.LIQUIDITY, arm=arm("C2"), context_chunks=CHUNKS, examples=[])
     assert prompt.context_words > 0
+
+
+def test_examples_and_target_have_separate_evidence_boundaries():
+    prompt = build_prompt(task=Task.LIQUIDITY, arm=arm("C5"),
+                          context_chunks=CHUNKS, examples=EXAMPLES)
+    before, target = prompt.user.split("### TARGET_REPORT", 1)
+    assert "END_EXAMPLES" in before
+    assert "resumo do exemplo" in before
+    assert "resumo do exemplo" not in target
+    assert "END_TARGET_REPORT" in target
+    assert "Only TARGET_REPORT is evidence" in prompt.system

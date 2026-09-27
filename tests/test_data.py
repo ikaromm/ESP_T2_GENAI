@@ -110,3 +110,57 @@ def test_word_counts(fake_root: Path):
     document = load_documents(fake_root, Task.LIQUIDITY, "val")[0]
     assert document.n_words == len(document.document.split())
     assert document.n_summary_words == len(document.summary.split())
+
+
+def test_task_tables_do_not_guess_placeholder_mapping(fake_root):
+    document = load_documents(fake_root, Task.LIQUIDITY, "val")[0]
+    assert document.table_indices == [1, 2]
+    assert [t.section_index for t in document.task_tables()] == [0, 1, 2]
+    assert all(t.section == "mda_liquidity_tables" for t in document.task_tables())
+
+
+def test_raw_ambiguous_value_preserved_without_inventing_scale():
+    table = Table(0, [["technology", "", "199 & 199,000", "2019", 1, 1]])
+    text = table.to_text()
+    assert "199 & 199,000 (2019)" in text
+    assert "ambiguous raw value" in text
+    assert "million" not in text
+
+
+def test_table_serialization_does_not_silently_drop_cells():
+    table = Table(0, [["row", "", str(i), "2020", i, 0] for i in range(125)])
+    assert "124 (2020)" in table.to_text()
+
+
+def test_table_evidence_keeps_raw_amounts_without_financial_filtering():
+    cells = [
+        ["cash", "", "34.5 & 34,479", "2019", 2, 2],
+        ["cash", "", "26.6", "2019", 2, 4],
+        ["cash", "usd million", "34.5", "2019", 2, 2],
+        ["cash", "usd million", "7.9", "2018", 2, 4],
+        ["net increase (decrease)", "usd million", "28.1", "2018", 3, 4],
+    ]
+    table = Table(0, cells)
+    text = table.evidence_text()
+    for cell in cells:
+        assert cell[2] in text
+    assert text == table.to_text()
+    assert all(r["included"] for r in table.evidence_audit())
+    assert table.cells == cells
+
+
+def test_conflicting_cells_are_preserved_without_selecting_a_correct_value():
+    table = Table(0, [["cash", "usd", "10", "2020"], ["cash", "usd", "20", "2020"]])
+    assert "cash | usd | 10 (2020)" in table.evidence_text()
+    assert "cash | usd | 20 (2020)" in table.evidence_text()
+    assert all(r["included"] for r in table.evidence_audit())
+
+
+def test_clean_text_removes_style_attribute_without_eating_financial_prose():
+    text = (
+        "cash was $ 19 thousand. style= `` font-size:12pt ; color: # auto ; `` > "
+        "debt was $ 2 million."
+    )
+    assert clean_text(text) == "cash was $ 19 thousand. debt was $ 2 million."
+    prose = "management style was cautious; cash declined."
+    assert clean_text(prose) == prose

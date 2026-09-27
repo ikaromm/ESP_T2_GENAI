@@ -103,8 +103,10 @@ Chaves:
 Cada tabela e uma lista de celulas
 `[rowname, colname, cell_value, date, cell_row_index, cell_col_index]`. O campo
 `colname` vem vazio na maioria dos casos; `cell_value` as vezes carrega duas
-formas do mesmo numero separadas por `&` (ex.: `'1.7 & 1,653,732'`, isto e, 1.7
-bilhoes escrito tambem em milhares).
+representações separadas por `&` (ex.: `'1.7 & 1,653,732'`). A tupla
+isolada não documenta a conversão nem a unidade: não se pode concluir uma escala
+só a partir desses valores. O serializador preserva a string e sinaliza
+ambiguidade, sem converter ou escolher um dos números.
 
 O alinhamento foi confirmado de duas formas: `stock_name=GNK` na linha 0 de
 `val_liquidity` corresponde a um texto sobre navios e fretes (Genco Shipping), e
@@ -114,6 +116,14 @@ A numeracao usada por `Table.index` neste projeto e uma **convencao local**
 (chave da tarefa primeiro, depois as de contexto): o dataset nao documenta o
 mapeamento exato entre `replace_table_token_<i>_th` e essas listas. E
 deterministica entre execucoes, mas nao necessariamente identica a do artigo.
+Desde a correção de 2026-09-26, essa numeração não seleciona tabelas no pipeline.
+São usadas todas as tabelas da chave da tarefa, com proveniência `section/index`
+e todas as células (sem os antigos cortes de 12 tabelas/120 células). As demais
+seções ficam fora da fonte experimental. Fonte inteira/C1 significa toda a prosa
+distribuída mais essas tabelas, não o 10-K completo. A mesma fonte alimenta todos
+os braços e o diagnóstico de grounding. Overflow provoca rejeição, não remoção
+silenciosa de células. A associação exata com os marcadores continua desconhecida;
+não é necessária para essa seleção por seção. Unidades continuam exigindo auditoria.
 
 ## Estatisticas medidas
 
@@ -133,10 +143,10 @@ Contagem de linhas por split (Liquidity): `val` tem 2.067 documentos. Os
 arquivos de `train` sao ~8x maiores, coerente com os 21.125 relatorios de 3.794
 empresas descritos no artigo.
 
-## O resumo de referencia nao esta contido no texto distribuido
+## Diagnostico historico da referencia (fora do escopo atual)
 
-Consequencia direta da selecao de conteudo, e a medida mais importante para
-interpretar os resultados. Comparando o **proprio resumo de referencia** com o
+A avaliacao atual usa ROUGE e BERTScore; o diagnostico numerico abaixo e
+historico e nao integra os endpoints nem filtra documentos ou tabelas. Comparando o **proprio resumo de referencia** com o
 extrato de ~6000 palavras (Liquidity/val, 50 documentos):
 
 | metrica da referencia contra o documento | media | minimo |
@@ -149,20 +159,21 @@ distribuido**. O material de onde esses numeros vieram foi descartado pela
 selecao de conteudo (provavelmente estava nas tabelas ou em secoes do 10-K fora
 do extrato).
 
-Duas implicacoes para a analise:
+Implicacoes para a analise:
 
-1. `numeric_grounding` tem **teto pratico de ~0,56**, nao 1,0. Avaliar uma
-   configuracao contra 1,0 levaria a concluir que todas alucinam metade dos
-   numeros, quando na verdade estao no mesmo regime da referencia.
-2. `ngram_grounding` mede **extratividade, nao fidelidade**. Os resumos do
-   FINDSum sao abstrativos (0,12 de sobreposicao de 4-gramas). Um modelo com 0,9
-   estaria colando trechos do documento -- comportamento pior, nao melhor. A
-   leitura util e a distancia ao patamar da referencia.
-
-`metrics.reference_baseline()` calcula esses valores e toda rodada os grava em
-`reference_baseline.json`. Se a opcao 2 da secao anterior (coletar os 10-Ks
-integrais na EDGAR) for adotada, espera-se que o teto numerico suba
-substancialmente -- e isso seria, por si, um argumento a favor dessa escolha.
+1. ~0,56 e um diagnostico historico das referencias contra a prosa, nao um teto.
+   `numeric_grounding` pode atingir 1; coincidencia de numeros nao prova suporte
+   da entidade, periodo ou relacao. Ausencia na fonte tambem nao prova que o
+   fato e falso no relatorio original.
+2. `ngram_grounding` mede extratividade, sem direcao de qualidade predefinida.
+   Copiar mais ou aproximar o patamar da referencia nao comprova fidelidade.
+3. A rodada atual recalcula `reference_baseline.json` usando prosa e as tabelas
+   serializadas disponiveis. Esses valores nao sao diretamente comparaveis ao
+   diagnostico historico calculado somente sobre prosa. A recuperacao usa tabelas
+   da secao da tarefa, divididas por linhas; isso nao e o 10-K integral.
+4. `context_numeric_grounding` usa somente o contexto apresentado ao modelo.
+   A avaliacao factual depende de revisao de afirmacoes com evidencias, conforme
+   [protocolo.md](protocolo.md), e exige auditar unidades e relações das células.
 
 ## Como baixar
 

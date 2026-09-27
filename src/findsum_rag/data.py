@@ -90,8 +90,22 @@ class Table:
 
     index: int
     cells: list[list]
+    section: str = ""
+    section_index: int = 0
 
-    def to_text(self, max_cells: int = 120) -> str:
+    def evidence_audit(self) -> list[dict]:
+        """Registra as tuplas de origem; nao julga nem filtra valores financeiros."""
+        return [{"cell": cell, "included": True} for cell in self.cells]
+
+    def evidence_text(self) -> str:
+        """Serializa a tabela inteira, sem corrigir valores ou inferir unidades.
+
+        Coluna vazia, representacoes com & e valores divergentes continuam
+        presentes. A serializacao nao avalia a qualidade do resumo.
+        """
+        return self.to_text()
+
+    def to_text(self, max_cells: int | None = None) -> str:
         """Lineariza a tabela para uso em prompt.
 
         Cada celula vira `linha | coluna | valor (data)`. As celulas do FINDSum
@@ -110,8 +124,10 @@ class Table:
             line = " | ".join(parts)
             if date:
                 line += f" ({date})"
+            if "&" in value:
+                line += " [ambiguous raw value; do not infer scale or split amounts]"
             lines.append(line)
-        if len(self.cells) > max_cells:
+        if max_cells is not None and len(self.cells) > max_cells:
             lines.append(f"[... {len(self.cells) - max_cells} celulas omitidas]")
         return "\n".join(lines)
 
@@ -166,8 +182,15 @@ class Document:
             seen.setdefault(int(match.group(1)), None)
         return list(seen)
 
+    def task_tables(self) -> list[Table]:
+        """Tabelas da secao explicitamente identificada, sem supor IDs de marcadores."""
+        return [t for t in self.tables if t.section == self.task.table_key]
+
     def referenced_tables(self) -> list[Table]:
-        """As tabelas efetivamente citadas no texto de entrada."""
+        """Associacao legada por indice local; NAO usar como mapeamento verificado.
+
+        A geracao usa task_tables(), baseada na secao declarada no registro.
+        """
         by_index = {t.index: t for t in self.tables}
         return [by_index[i] for i in self.table_indices if i in by_index]
 
@@ -238,8 +261,10 @@ def _tables_from_record(record: dict, task: Task) -> list[Table]:
     )
     tables: list[Table] = []
     for key in keys:
-        for cells in record.get(key) or []:
-            tables.append(Table(index=len(tables), cells=cells))
+        for section_index, cells in enumerate(record.get(key) or []):
+            tables.append(
+                Table(index=len(tables), cells=cells, section=key, section_index=section_index)
+            )
     return tables
 
 
@@ -272,8 +297,7 @@ def load_documents(
     if missing:
         listed = "\n  ".join(str(p) for p in missing)
         raise FileNotFoundError(
-            f"arquivos do FINDSum ausentes:\n  {listed}\n"
-            "rode: python scripts/fetch_findsum.py"
+            f"arquivos do FINDSum ausentes:\n  {listed}\nrode: python scripts/fetch_findsum.py"
         )
 
     frames = [
@@ -341,4 +365,9 @@ def clean_text(text: str) -> str:
     """Remove marcadores do dataset e normaliza espacos em branco."""
     text = text.replace(SEGMENT_SEPARATOR, " ")
     text = strip_table_tokens(text)
+    # A exportacao FINDSum pode deixar atributos HTML com aspas Penn Treebank.
+    # Remove somente atributos delimitados; nunca corta prosa ate um ';' generico.
+    text = re.sub(
+        r"\bstyle\s*=\s*(?:``.*?``|\"[^\"]*\"|'[^']*')\s*>?", " ", text, flags=re.I | re.S
+    )
     return re.sub(r"\s+", " ", text).strip()

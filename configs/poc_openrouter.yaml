@@ -1,0 +1,21 @@
+# PoC de integracao: um documento dev, pool reduzido de 32 exemplos.
+# Nao e o piloto metodologico nem a avaliacao final.
+name: poc_openrouter
+output_dir: outputs
+seed: 42
+data:
+  eval_set: dev
+  n_eval_docs: 1
+  n_example_docs: 32
+  example_max_words: 350
+retrieval:
+  context_max_tokens: 3072
+  top_k: 12
+generation:
+  backend: openrouter
+  model_name: qwen/qwen3.8-27b:free
+  load_in_4bit: false
+  max_input_tokens: 16384
+  max_new_tokens: 3072
+  temperature: 0
+  top_p: 1

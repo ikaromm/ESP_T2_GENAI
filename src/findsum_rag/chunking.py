@@ -54,7 +54,6 @@ def chunk_document(
     overlap: int = 40,
     use_passages: bool = True,
     include_tables: bool = True,
-    max_tables: int = 12,
 ) -> list[Chunk]:
     """Gera os trechos de um relatorio para indexacao no RAG.
 
@@ -63,7 +62,7 @@ def chunk_document(
     `chunk_size`. Isso preserva as fronteiras de conteudo da selecao original em
     vez de cortar o texto em pontos arbitrarios.
 
-    As tabelas citadas no texto entram como trechos proprios, para que a
+    As tabelas da secao da tarefa entram como trechos proprios, para que a
     recuperacao possa trazer evidencia numerica tabular, nao so textual.
     """
     chunks: list[Chunk] = []
@@ -82,17 +81,31 @@ def chunk_document(
             chunks.append(Chunk(doc_id=document.doc_id, index=len(chunks), text=piece))
 
     if include_tables:
-        for table in document.referenced_tables()[:max_tables]:
-            text = table.to_text()
+        for table in document.task_tables():
+            text = table.evidence_text()
             if not text.strip():
                 continue
-            chunks.append(
-                Chunk(
-                    doc_id=document.doc_id,
-                    index=len(chunks),
-                    text=f"[tabela {table.index}]\n{text}",
-                    source="table",
+            # Preserva celulas completas: uma tabela extensa nao deve monopolizar
+            # a recuperacao nem ter valores cortados em janelas por palavras.
+            batches, lines, words = [], [], 0
+            for line in text.splitlines():
+                size = len(line.split())
+                if lines and words + size > chunk_size:
+                    batches.append("\n".join(lines))
+                    lines, words = [], 0
+                lines.append(line)
+                words += size
+            if lines:
+                batches.append("\n".join(lines))
+            for batch in batches:
+                chunks.append(
+                    Chunk(
+                        doc_id=document.doc_id,
+                        index=len(chunks),
+                        text=(f"[tabela {table.section}/{table.section_index}; "
+                              "raw values; units only if explicitly stated]\n" + batch),
+                        source="table",
+                    )
                 )
-            )
 
     return chunks

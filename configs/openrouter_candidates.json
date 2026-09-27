@@ -1,0 +1,62 @@
+{
+  "scope": "dev_preparation_only",
+  "models": {
+    "ling-free": {
+      "model": "inclusionai/ling-3.0-flash-fin:free",
+      "provider": "novita",
+      "tokenizer": "inclusionAI/Ling-3.0-flash-Fin",
+      "context_length": 262144,
+      "input_per_million": 0,
+      "output_per_million": 0
+    },
+    "ling-paid": {
+      "model": "inclusionai/ling-3.0-flash-fin",
+      "provider": "deepinfra/fp4",
+      "tokenizer": "inclusionAI/Ling-3.0-flash-Fin",
+      "context_length": 262144,
+      "input_per_million": 0.06,
+      "output_per_million": 0.18,
+      "role": "contingency_after_confirmed_daily_quota_exhaustion",
+      "provider_contract_validated": false
+    },
+    "qwen37": {
+      "model": "qwen/qwen3.7-flash",
+      "provider": "alibaba",
+      "tokenizer": null,
+      "context_length": 1000000,
+      "input_per_million": 0.03,
+      "output_per_million": 0.13,
+      "pricing_overrides": [
+        {"min_prompt_tokens": 32000, "input_per_million": 0.10, "output_per_million": 0.40},
+        {"min_prompt_tokens": 256000, "input_per_million": 0.20, "output_per_million": 0.80}
+      ],
+      "blocker": "official_tokenizer_or_exact_counting_method_not_validated"
+    },
+    "gemma26": {
+      "model": "google/gemma-4-26b-a4b-it",
+      "provider": "darkbloom",
+      "tokenizer": "google/gemma-4-26B-A4B-it",
+      "context_length": 131072,
+      "input_per_million": 0.042,
+      "output_per_million": 0.22,
+      "provider_contract_validated": false
+    }
+  },
+  "generation": {
+    "temperature": 0,
+    "top_p": 1,
+    "max_tokens": 3072,
+    "reasoning": {"enabled": false},
+    "seed_sent": false,
+    "allow_fallbacks": false
+  },
+  "daily_quota_policy": {
+    "requests_per_minute": 20,
+    "retry_delays_seconds": [1, 2, 4, 8, 16],
+    "respect_retry_after": true,
+    "shared_pool_429_is_not_daily_quota_exhaustion": true,
+    "never_mix_providers_within_a_document_six_arm_block": true,
+    "paid_provider_requires_separate_run_and_contract_validation": true,
+    "paid_budget_must_be_set_before_execution": true
+  }
+}

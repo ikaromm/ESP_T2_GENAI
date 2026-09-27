@@ -15,11 +15,10 @@ dependencies = [
     # geracao
     "torch>=2.5.1",
     "transformers>=4.47.1",
-    "accelerate>=1.2.1",
-    "bitsandbytes>=0.45.0",
     # avaliacao
     "rouge-score>=0.1.2",
     "bert-score>=0.3.13",
+    "nltk>=3.9",
     "scipy>=1.14.1",
     "numpy>=1.26.4",
     # infraestrutura

@@ -19,6 +19,8 @@ from typing import Protocol
 
 import numpy as np
 
+from .context import prefix, token_count
+
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
@@ -51,14 +53,50 @@ class SentenceTransformerEncoder:
     def encode_texts(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dimension), dtype=np.float32)
-        vectors = self.model.encode(
-            texts,
-            batch_size=self.batch_size,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
-        return np.asarray(vectors, dtype=np.float32)
+        # Token IDs sao passados ao forward: decode/reencode poderia alterar o
+        # tamanho das janelas e voltar a provocar truncamento silencioso.
+        import torch
+
+        tokenizer = self.model.tokenizer
+        if not tokenizer.is_fast:
+            raise ValueError("encoder exige tokenizer fast para preservar todas as janelas")
+        special = tokenizer.num_special_tokens_to_add(False)
+        if self.model.max_seq_length <= special:
+            raise ValueError("janela do encoder nao comporta tokens de conteudo")
+        windows, owners, weights = [], [], []
+        for owner, text in enumerate(texts):
+            remaining = text
+            while True:
+                part = prefix(tokenizer, remaining, self.model.max_seq_length - special)
+                if remaining and not part:
+                    raise ValueError("tokenizer nao produziu uma janela com conteudo")
+                encoded = tokenizer(part, truncation=False, return_attention_mask=True)
+                if len(encoded["input_ids"]) > self.model.max_seq_length:
+                    raise ValueError("janela ultrapassou o limite do encoder")
+                windows.append(
+                    {key: encoded[key] for key in tokenizer.model_input_names if key in encoded}
+                )
+                owners.append(owner)
+                weights.append(max(1, token_count(tokenizer, part)))
+                remaining = remaining[len(part) :]
+                if not remaining:
+                    break
+        totals = np.zeros((len(texts), self.dimension), dtype=np.float32)
+        self.model.eval()
+        with torch.inference_mode():
+            for start in range(0, len(windows), self.batch_size):
+                batch = tokenizer.pad(
+                    windows[start : start + self.batch_size], padding=True, return_tensors="pt"
+                )
+                features = {key: value.to(self.model.device) for key, value in batch.items()}
+                vectors = self.model(features)["sentence_embedding"].cpu().numpy()
+                norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+                vectors = vectors / np.maximum(norms, 1e-12)
+                for offset, vector in enumerate(vectors):
+                    j = start + offset
+                    totals[owners[j]] += vector * weights[j]
+        norms = np.linalg.norm(totals, axis=1, keepdims=True)
+        return totals / np.maximum(norms, 1e-12)
 
     @property
     def dimension(self) -> int:

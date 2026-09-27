@@ -123,8 +123,12 @@ def test_score_document_and_aggregate():
     source = "cash flow was $ 50.0 million and debt was $ 12.5 million in 2016"
     reference = "cash flow was $ 50.0 million"
     scores = [
-        score_document("d1", "cash flow was $ 50.0 million", reference, source),
-        score_document("d2", "cash flow was $ 99.9 million", reference, source),
+        score_document(
+            "d1", "cash flow was $ 50.0 million", reference, source, legacy_diagnostics=True
+        ),
+        score_document(
+            "d2", "cash flow was $ 99.9 million", reference, source, legacy_diagnostics=True
+        ),
     ]
     assert scores[0].numeric.f1 == 1.0
     assert scores[0].numeric_grounding == 1.0
@@ -142,7 +146,9 @@ def test_aggregate_empty():
 
 def test_flat_includes_all_metric_keys():
     source = "cash of 50.0"
-    flat = score_document("d", "cash of 50.0", "cash of 50.0", source).flat()
+    flat = score_document(
+        "d", "cash of 50.0", "cash of 50.0", source, legacy_diagnostics=True
+    ).flat()
     for key in (
         "rouge1",
         "rouge2",
@@ -156,3 +162,89 @@ def test_flat_includes_all_metric_keys():
         "n_words",
     ):
         assert key in flat
+
+
+def test_default_scoring_excludes_numeric_and_factual_evaluation(monkeypatch):
+    import findsum_rag.metrics as metrics
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("diagnostico numerico fora do escopo")
+
+    monkeypatch.setattr(metrics, "numeric_prf", forbidden)
+    monkeypatch.setattr(metrics, "numeric_grounding", forbidden)
+    monkeypatch.setattr(metrics, "ngram_grounding", forbidden)
+    score = metrics.score_document("d", "cash was 10", "cash was 20", "cash was 10")
+    assert set(score.flat()) == {"doc_id", "rouge1", "rouge2", "rougeL", "bertscore", "n_words"}
+    assert "numeric_f1_mean" not in metrics.aggregate([score])
+
+
+def test_bert_audit_uses_whole_text_with_unbounded_tokenizer():
+    from findsum_rag.metrics import _audit_bert_tokenizer
+
+    class Tokenizer:
+        model_max_length = 10**30
+
+        def encode(self, text, **kwargs):
+            ids = [1, *range(len(text)), 2]
+            return ids[: kwargs["max_length"]] if kwargs.get("truncation") else ids
+
+    tok = Tokenizer()
+    audit = _audit_bert_tokenizer(["a" * 900, "b" * 1200], tok)
+    assert tok.model_max_length == 1202
+    assert [row["evaluated_tokens"] for row in audit] == [902, 1202]
+    assert all(not row["truncated"] for row in audit)
+
+
+def test_bert_audit_rejects_short_encoder_instead_of_silent_truncation():
+    from findsum_rag.metrics import _audit_bert_tokenizer
+
+    class Tokenizer:
+        model_max_length = 512
+
+        def encode(self, text, **kwargs):
+            ids = [1, *range(len(text)), 2]
+            return ids[: kwargs["max_length"]] if kwargs.get("truncation") else ids
+
+    with pytest.raises(ValueError, match="truncaria"):
+        _audit_bert_tokenizer(["a" * 900], Tokenizer())
+
+
+def test_bertscore_components_preserve_precision_recall_orientation(monkeypatch):
+    import bert_score
+
+    import findsum_rag.metrics as metrics
+
+    audited = []
+
+    class Scorer:
+        def __init__(self, **kwargs):
+            self._tokenizer = object()
+
+        def score(self, predictions, references, **kwargs):
+            assert predictions == ["generated"] and references == ["reference"]
+            return [0.2], [0.8], [0.32]
+
+    monkeypatch.setattr(bert_score, "BERTScorer", Scorer)
+    monkeypatch.setattr(metrics, "_audit_bert_tokenizer", lambda texts, _: audited.extend(texts))
+    result = metrics.bertscore_components(["generated"], ["reference"])[0]
+    assert (result.precision, result.recall, result.f1) == (0.2, 0.8, 0.32)
+    assert audited == ["generated", "reference"]
+    assert metrics.bertscore(["generated"], ["reference"]) == [0.32]
+
+
+def test_meteor_tokenization_and_reference_direction(monkeypatch):
+    import importlib
+
+    import findsum_rag.metrics as metrics
+
+    module = importlib.import_module("nltk.translate.meteor_score")
+    monkeypatch.setattr(metrics, "ensure_meteor_resources", lambda: None)
+
+    def evaluate(reference, hypothesis, **kwargs):
+        assert reference == ["cash", "rose", "."]
+        assert hypothesis == ["cash", "grew", "!"]
+        assert kwargs == {"alpha": 0.9, "beta": 3.0, "gamma": 0.5}
+        return 0.7
+
+    monkeypatch.setattr(module, "single_meteor_score", evaluate)
+    assert metrics.meteor("Cash grew!", "Cash rose.") == 0.7

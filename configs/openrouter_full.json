@@ -1,0 +1,133 @@
+{
+  "scope": "frozen_full_openrouter",
+  "models": {
+    "ling-free": {
+      "model": "inclusionai/ling-3.0-flash-fin:free",
+      "provider": "novita",
+      "tokenizer": "inclusionAI/Ling-3.0-flash-Fin",
+      "context_length": 262144,
+      "input_per_million": 0,
+      "output_per_million": 0
+    },
+    "qwen37": {
+      "model": "qwen/qwen3.7-flash",
+      "provider": "alibaba",
+      "tokenizer": null,
+      "context_length": 1000000,
+      "input_per_million": 0.1,
+      "output_per_million": 0.4,
+      "pricing_overrides": [
+        {
+          "min_prompt_tokens": 32000,
+          "input_per_million": 0.1,
+          "output_per_million": 0.4
+        },
+        {
+          "min_prompt_tokens": 256000,
+          "input_per_million": 0.2,
+          "output_per_million": 0.8
+        }
+      ],
+      "base_input_per_million": 0.03,
+      "base_output_per_million": 0.13
+    },
+    "gemma26": {
+      "model": "google/gemma-4-26b-a4b-it",
+      "provider": "darkbloom",
+      "tokenizer": "google/gemma-4-26B-A4B-it",
+      "context_length": 131072,
+      "input_per_million": 0.042,
+      "output_per_million": 0.22,
+      "provider_contract_validated": true,
+      "validation_scope": "dev10; catalogo publico reconsultado; preflight full pendente"
+    }
+  },
+  "generation": {
+    "temperature": 0,
+    "top_p": 1,
+    "max_tokens": 8192,
+    "reasoning": {
+      "enabled": false
+    },
+    "seed_sent": false,
+    "allow_fallbacks": false
+  },
+  "daily_quota_policy": {
+    "requests_per_minute": 20,
+    "retry_delays_seconds": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "respect_retry_after": true,
+    "shared_pool_429_is_not_daily_quota_exhaustion": true,
+    "never_mix_providers_within_a_document_six_arm_block": true,
+    "paid_provider_requires_separate_run_and_contract_validation": true,
+    "paid_budget_must_be_set_before_execution": true
+  },
+  "full_policy": {
+    "input_limit": 49152,
+    "output_limit": 8192,
+    "context_margin": 256,
+    "eligible_cohort": "all_1000_reserved_documents_must_pass_all_six_arms_all_three_models",
+    "metrics_only": true,
+    "human_review": false,
+    "length_response": "retain_with_flag_and_score_as_observed",
+    "retry_statuses": [
+      408,
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
+    "max_attempts": 6,
+    "source_policy": "prose_and_raw_task_tables_no_financial_filter",
+    "sampling": {
+      "method": "random_without_replacement",
+      "seed": 42,
+      "within": "reserved_manifest_split",
+      "record_ids": true
+    },
+    "expected_documents": 1000,
+    "primary_metrics": [
+      "bertscore",
+      "rougeL"
+    ],
+    "descriptive_metrics": [
+      "rouge1",
+      "rouge2",
+      "bertscore_precision",
+      "bertscore_recall",
+      "meteor"
+    ],
+    "numeric_evaluation": false,
+    "factual_evaluation": false,
+    "inference_family": "ten_tests_per_model_no_pooled_claim"
+  },
+  "budgets_usd": {
+    "ling_paid_scenario": 15,
+    "qwen_generation": 18,
+    "gemma_generation": 9,
+    "qwen_calibration": 18,
+    "all_paid_total": 60
+  },
+  "execution_policy": {
+    "ling_mode": "free_only_no_automatic_paid_fallback",
+    "paid_ling_budget_is_scenario_only": true,
+    "full_lock_required": true,
+    "preflight_all_18000_required": false,
+    "partial_results_cannot_confirm_hypotheses": true,
+    "pause_on_quota_or_budget": true,
+    "preflight_all_6000_per_model_before_its_generation": true,
+    "ling_batches": {
+      "size": 100,
+      "count": 10,
+      "one_batch_per_invocation": true,
+      "transient_circuit_cooldown_seconds": 3600,
+      "full_hypotheses_only_after_1000": true
+    }
+  }
+}

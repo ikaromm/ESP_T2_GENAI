@@ -1,6 +1,6 @@
 """Configuracao dos experimentos.
 
-As cinco configuracoes do projeto (C1 a C5) sao declaradas aqui como dados, nao
+As seis configuracoes do projeto (C1, C1t e C2 a C5) sao declaradas aqui como dados, nao
 como codigo espalhado pelo pipeline. A comparacao so e valida se tudo o que nao
 esta sob investigacao permanecer constante entre elas, portanto modelo, limites
 de contexto e parametros de geracao vivem no nivel do experimento, e cada
@@ -10,11 +10,13 @@ configuracao varia apenas o uso de RAG e a estrategia de exemplos.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
 from .data import Task
+from .remote_models import FREE_ENDPOINTS, PAID_ENDPOINTS
 
 
 class RetrievalConfig(BaseModel):
@@ -24,7 +26,7 @@ class RetrievalConfig(BaseModel):
     chunk_size: int = Field(default=220, gt=0, description="palavras por trecho")
     chunk_overlap: int = Field(default=40, ge=0)
     top_k: int = Field(default=12, gt=0, description="trechos recuperados por documento")
-    query_words: int = Field(default=400, gt=0, description="palavras usadas na consulta")
+    context_max_tokens: int = Field(default=3072, gt=0)
     include_tables: bool = True
 
     @model_validator(mode="after")
@@ -37,26 +39,30 @@ class RetrievalConfig(BaseModel):
 class GenerationConfig(BaseModel):
     """Parametros da LLM. Mantidos identicos entre as configuracoes."""
 
-    # Qwen3.5 nao tem tamanho 7B; os densos sao 0.8B, 2B, 4B, 9B e 27B. O 9B e o
-    # maior que cabe nos 12 GB da GPU em NF4 (~5,3 GB); o 27B pediria ~15 GB.
-    model_name: str = "Qwen/Qwen3.5-9B"
-    load_in_4bit: bool = Field(
-        default=True, description="quantizacao 4-bit, necessaria em GPU de 12 GB"
-    )
-    # Os resumos de referencia do FINDSum-Liquidity tem ~1000 palavras de mediana
-    # (~1374 tokens). Um limite menor truncaria a geracao e penalizaria a
-    # cobertura de TODAS as configuracoes.
-    max_new_tokens: int = Field(default=1536, gt=0)
-    temperature: float = Field(default=0.0, ge=0.0, description="0 = geracao greedy")
+    model_name: str = "inclusionai/ling-3.0-flash-fin:free"
+    backend: Literal["openrouter"] = "openrouter"
+    # Aceitos somente para ler os artefatos antigos, nunca usados para geracao.
+    load_in_4bit: Literal[False] = False
+    dtype: str = "bfloat16"
+    max_new_tokens: int = Field(default=8192, gt=0)
+    temperature: float = Field(default=0.0, ge=0.0)
     top_p: float = Field(default=1.0, gt=0.0, le=1.0)
     seed: int = 42
-    # Medido: 4 exemplos com resumo integral + top_k=12 dao ~10,3 mil tokens;
-    # com top_k=27 (documento todo recuperado) sobem a ~14,3 mil. 16384 cobre os
-    # dois casos, e a VRAM permite (pico medido de 7,9 GB em 10,3 mil tokens).
-    max_input_tokens: int = Field(
-        default=16384, gt=0, description="orcamento de contexto do prompt"
-    )
-    dtype: str = "bfloat16"
+    max_input_tokens: int = Field(default=49152, gt=0)
+
+    @model_validator(mode="after")
+    def _check_remote(self) -> GenerationConfig:
+        if self.backend == "openrouter":
+            if self.model_name not in (FREE_ENDPOINTS | PAID_ENDPOINTS):
+                raise ValueError("modelo OpenRouter fora dos endpoints registrados")
+            if self.temperature != 0 or self.top_p != 1:
+                raise ValueError("OpenRouter exige temperature=0 e top_p=1")
+            endpoint = (FREE_ENDPOINTS | PAID_ENDPOINTS)[self.model_name]
+            if self.max_input_tokens + self.max_new_tokens > endpoint.context_length:
+                raise ValueError("prompt e saida excedem a janela do endpoint OpenRouter")
+            if self.max_new_tokens > endpoint.max_completion_tokens:
+                raise ValueError("saida excede o limite do endpoint OpenRouter")
+        return self
 
     @property
     def do_sample(self) -> bool:
@@ -99,15 +105,9 @@ class ExperimentArm(BaseModel):
         return self
 
 
-# C1 recebe o documento INTEIRO: ele cabe na janela do modelo (7,3 mil tokens de
-# mediana contra 262 mil), logo truncar seria construir um baseline artificial.
-# Isso muda o que H1 afirma -- deixa de ser "o RAG da mais informacao" e passa a
-# ser "um recorte curado supera o documento inteiro", testavel pela degradacao
-# conhecida de atencao em contexto longo.
-#
-# C1t existe para separar os dois efeitos: com o MESMO orcamento de C2, mas
-# cortando em vez de recuperar, isola quanto do resultado vem de recuperar e
-# quanto vem apenas de reduzir o contexto.
+# C1 recebe a fonte disponivel sem duplicacao por sobreposicao de chunks.
+# O preflight verifica a janela configurada em TODOS os prompts.
+# C1t e C2 tem contagens iguais verificadas pelo tokenizer da LLM.
 N_EXAMPLES = 4
 
 DEFAULT_ARMS: list[ExperimentArm] = [
@@ -123,9 +123,7 @@ DEFAULT_ARMS: list[ExperimentArm] = [
         context_mode="truncated",
         example_strategy="none",
     ),
-    ExperimentArm(
-        id="C2", label="RAG", context_mode="retrieved", example_strategy="none"
-    ),
+    ExperimentArm(id="C2", label="RAG", context_mode="retrieved", example_strategy="none"),
     ExperimentArm(
         id="C3",
         label="RAG + few-shot fixo",
@@ -169,8 +167,10 @@ class DataConfig(BaseModel):
         description="limita o conjunto avaliado; None usa ele inteiro",
     )
     n_example_docs: int | None = Field(default=None, gt=0)
-    example_max_words: int = Field(
-        default=350, gt=0, description="palavras do DOCUMENTO de cada exemplo"
+    example_max_words: int | None = Field(
+        default=None,
+        gt=0,
+        description="palavras do DOCUMENTO de cada exemplo; None mantem integral",
     )
     example_max_summary_words: int | None = Field(
         default=None,
@@ -233,5 +233,6 @@ class ExperimentConfig(BaseModel):
         for arm in self.arms:
             if arm.id == arm_id:
                 return arm
-        raise KeyError(f"configuracao {arm_id!r} nao encontrada; disponiveis: "
-                       f"{[a.id for a in self.arms]}")
+        raise KeyError(
+            f"configuracao {arm_id!r} nao encontrada; disponiveis: {[a.id for a in self.arms]}"
+        )

@@ -1,13 +1,5 @@
-# Imagem de execucao dos experimentos.
-#
-# Nao inclui dados nem pesos de modelo: o FINDSum tem 6,5 GB e o modelo ~6 GB,
-# ambos montados como volume para que a imagem fique reproduzivel e as camadas
-# nao precisem ser reconstruidas quando os dados mudam.
-#
-# CUDA vem das bibliotecas que o proprio torch empacota (wheel cu130), por isso a
-# base e uma imagem Python enxuta em vez de uma nvidia/cuda: basta o driver do
-# host mais o nvidia-container-toolkit. Isso evita o descasamento classico entre
-# a versao de CUDA da imagem base e a do torch.
+# Embeddings e metricas locais; toda geracao ocorre via OpenRouter.
+# GPU e opcional para acelerar avaliacao, nao e requisito de geracao.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ENV UV_LINK_MODE=copy \
@@ -32,6 +24,7 @@ COPY scripts ./scripts
 COPY tests ./tests
 COPY configs ./configs
 RUN uv sync --locked --no-dev
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data wordnet
 
 # O container roda com o UID do host (ver deploy.sh) para que os arquivos
 # gravados nos volumes nao saiam pertencendo ao root. Esses diretorios precisam

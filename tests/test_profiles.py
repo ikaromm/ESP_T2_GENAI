@@ -18,8 +18,8 @@ PROFILES = sorted(p.stem for p in CONFIGS.glob("*.yaml"))
 
 
 def test_expected_profiles_exist():
-    assert "test_50" in PROFILES
-    assert "eval_1000" in PROFILES
+    assert "dev10_openrouter_complete" in PROFILES
+    assert "full_openrouter" in PROFILES
 
 
 @pytest.mark.parametrize("profile", PROFILES)
@@ -42,18 +42,18 @@ def test_profile_name_matches_filename(profile: str):
     )
 
 
-def test_test_50_does_not_touch_the_evaluation_set():
-    """O conjunto `eval` e aberto uma unica vez, pelo perfil eval_1000."""
-    dev = ExperimentConfig.from_yaml(CONFIGS / "test_50.yaml")
+def test_dev10_openrouter_complete_does_not_touch_the_evaluation_set():
+    """O conjunto `eval` e aberto uma unica vez, pelo perfil full_openrouter."""
+    dev = ExperimentConfig.from_yaml(CONFIGS / "dev10_openrouter_complete.yaml")
     assert dev.data.eval_set == "dev"
-    assert dev.data.n_eval_docs == 50
+    assert dev.data.n_eval_docs == 10
 
 
-def test_eval_1000_uses_the_full_evaluation_set():
-    final = ExperimentConfig.from_yaml(CONFIGS / "eval_1000.yaml")
+def test_full_openrouter_uses_the_full_evaluation_set():
+    final = ExperimentConfig.from_yaml(CONFIGS / "full_openrouter.yaml")
     assert final.data.eval_set == "eval"
-    # None = usa o conjunto inteiro, sem limite.
-    assert final.data.n_eval_docs is None
+    # Full exige exatamente os 1000 reservados.
+    assert final.data.n_eval_docs == 1000
 
 
 def test_profiles_never_reuse_the_example_set_for_evaluation():
@@ -62,7 +62,7 @@ def test_profiles_never_reuse_the_example_set_for_evaluation():
         assert config.data.eval_set != config.data.example_set
 
 
-@pytest.mark.parametrize("profile", ["test_50", "eval_1000"])
+@pytest.mark.parametrize("profile", ["dev10_openrouter_complete", "full_openrouter"])
 def test_profiles_cover_the_full_ablation_chain(profile: str):
     config = ExperimentConfig.from_yaml(CONFIGS / f"{profile}.yaml")
     assert [a.id for a in config.arms] == ["C1", "C1t", "C2", "C3", "C4", "C5"]
@@ -72,7 +72,7 @@ def test_profiles_cover_the_full_ablation_chain(profile: str):
     assert by_id["C2"].context_mode == "retrieved"
 
 
-@pytest.mark.parametrize("profile", ["test_50", "eval_1000"])
+@pytest.mark.parametrize("profile", ["dev10_openrouter_complete", "full_openrouter"])
 def test_retrieval_budget_is_smaller_than_the_document(profile: str):
     """`top_k` alto demais faz o RAG trazer o documento inteiro e C2 = C1.
 
@@ -92,7 +92,7 @@ def test_profiles_keep_generation_identical_across_arms():
     Os parametros de geracao vivem no nivel do experimento justamente para que
     nao possam divergir por configuracao.
     """
-    for profile in ("test_50", "eval_1000"):
+    for profile in ("dev10_openrouter_complete", "full_openrouter"):
         raw = yaml.safe_load((CONFIGS / f"{profile}.yaml").read_text(encoding="utf-8"))
         for arm in raw["arms"]:
             assert set(arm) <= {"id", "label", "context_mode", "example_strategy", "n_examples"}, (
@@ -108,7 +108,7 @@ def test_max_input_tokens_fits_the_worst_case_prompt():
     ~14,3 mil. Um orcamento menor truncaria silenciosamente as configuracoes com
     few-shot e so elas, invalidando a comparacao.
     """
-    for profile in ("test_50", "eval_1000"):
+    for profile in ("dev10_openrouter_complete", "full_openrouter"):
         config = ExperimentConfig.from_yaml(CONFIGS / f"{profile}.yaml")
         assert config.generation.max_input_tokens >= 14500, (
             f"{profile}: max_input_tokens={config.generation.max_input_tokens} "

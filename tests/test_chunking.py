@@ -51,10 +51,13 @@ def test_chunk_document_uses_passages_and_tables(fake_root: Path):
     text_chunks = [c for c in chunks if c.source == "text"]
     assert all("replace_table_token" not in c.text for c in text_chunks)
     assert all("story_separator_special_tag" not in c.text for c in text_chunks)
-    # As tabelas citadas entram como trechos proprios.
+    # Campos incompletos nao justificam excluir os valores brutos.
     table_chunks = [c for c in chunks if c.source == "table"]
-    assert len(table_chunks) == 2
-    assert table_chunks[0].text.startswith("[tabela ")
+    assert table_chunks
+    for table in document.tables:
+        if table.section == document.task.table_key:
+            for cell in table.cells:
+                assert str(cell[2]) in "\n".join(c.text for c in table_chunks)
 
 
 def test_chunk_document_can_skip_tables(fake_root: Path):
@@ -69,3 +72,15 @@ def test_chunk_document_subdivides_long_passages(fake_root: Path):
     many = chunk_document(document, chunk_size=3, overlap=0, include_tables=False)
     assert len(many) > len(few)
     assert all(c.n_words <= 3 for c in many)
+
+
+def test_large_table_is_split_without_losing_or_splitting_cells(fake_root):
+    document = load_documents(fake_root, Task.LIQUIDITY, "val")[0]
+    document.tables[0].cells = [[f"unique_label_{i}", "usd", str(i), "2020", i, 1]
+                               for i in range(150)]
+    chunks = chunk_document(document, chunk_size=40, overlap=0)
+    tables = [c.text for c in chunks if c.source == "table"]
+    assert len(tables) > 3
+    combined = "\n".join(tables)
+    for i in range(150):
+        assert combined.count(f"unique_label_{i} | usd | {i} (2020)") == 1

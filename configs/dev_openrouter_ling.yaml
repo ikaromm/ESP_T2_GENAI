@@ -1,0 +1,61 @@
+name: dev_openrouter_ling
+output_dir: outputs
+seed: 42
+data:
+  root: data/raw/findsum
+  task: liquidity
+  manifest: data/interim/splits-liquidity.json
+  eval_set: dev
+  example_set: examples
+  n_eval_docs: 50
+  n_example_docs: null
+  example_max_words: 350
+  example_max_summary_words: null
+retrieval:
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  chunk_size: 220
+  chunk_overlap: 40
+  top_k: 12
+  context_max_tokens: 3072
+  include_tables: true
+generation:
+  model_name: inclusionai/ling-3.0-flash-fin:free
+  backend: openrouter
+  load_in_4bit: false
+  max_new_tokens: 3072
+  temperature: 0.0
+  top_p: 1.0
+  seed: 42
+  max_input_tokens: 20480
+  dtype: bfloat16
+arms:
+- id: C1
+  label: Baseline (documento inteiro, sem few-shot)
+  context_mode: full
+  example_strategy: none
+  n_examples: 0
+- id: C1t
+  label: Controle (truncado no orcamento do RAG, sem few-shot)
+  context_mode: truncated
+  example_strategy: none
+  n_examples: 0
+- id: C2
+  label: RAG
+  context_mode: retrieved
+  example_strategy: none
+  n_examples: 0
+- id: C3
+  label: RAG + few-shot fixo
+  context_mode: retrieved
+  example_strategy: fixed
+  n_examples: 4
+- id: C4
+  label: RAG + few-shot aleatorio
+  context_mode: retrieved
+  example_strategy: random
+  n_examples: 4
+- id: C5
+  label: RAG + few-shot dinamico
+  context_mode: retrieved
+  example_strategy: dynamic
+  n_examples: 4
