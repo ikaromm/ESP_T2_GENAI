@@ -65,3 +65,16 @@ A pedido do usuário, permitido iniciar Ling de forma independente em dez lotes 
 ## Estado vigente — 27/09/2026
 
 Lock ativo: `c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1`. Ling preparado em `outputs/full-ling-prepared`: 1.000 documentos, 6.000 prompts válidos, maior entrada 43.743 tokens, teto 49.152 e reserva de saída 8.192. Os 5.934 prompts inicialmente válidos ficaram idênticos após a correção do reconhecimento de tabelas; os 66 restantes foram completados sem substituir casos. 262 testes passaram (sem slow/test_real_data.py), além do preflight real. Gerações OpenRouter nesta preparação: zero. Qwen/Gemma seguem pendentes.
+
+
+## Atualização operacional em 27/09/2026: três executores de lotes
+
+Disponíveis `findsum ling-batch`, `findsum qwen-batch` e `findsum gemma-batch`, todos com os mesmos dez grupos de 100 documentos. Sem `--execute`, não enviam chamadas. Qwen exige antes a calibração paga dos 6.000 prompts; Gemma usa preparação local a partir dos insumos congelados do Ling. Guia: [lotes Qwen/Gemma](lotes-qwen-gemma-full.md).
+
+Lock operacional atual: `e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0`. Preserva explicitamente a preparação Ling vinculada a `c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1` e sua identidade de retomada. A compatibilidade exige invariância dos insumos científicos; apenas os arquivos operacionais explicitamente relacionados podem diferir. Coorte, fonte, recuperação, exemplos, prompts Ling, métricas e limites permaneceram iguais.
+
+Verificação real paralela do Ling: 6.000 prompts e 213 respostas já aceitas conferidos em 79,2 segundos, com quatro trabalhadores locais, sem API. O usuário iniciou a geração Ling em seu terminal; os números continuam mudando e o ledger é a fonte do progresso atual. Os novos logs não alteram um processo já carregado: aparecem na próxima execução.
+
+Validação de código: 270 testes passaram, excluindo `slow` e `test_real_data.py`. Logs incluem etapas, progresso de prompts, atividade em esperas, requisições, retries, latência, tokens e custo. O paralelismo se restringe às operações locais de validação/preparação; não aumenta a concorrência das chamadas OpenRouter.
+
+Gemma também preparado integralmente: 6.000 prompts, zero erros, maior entrada 43.088 tokens; relatório local `outputs/full-gemma-prepared/report.json`. Qwen ainda exige sondas pagas; a validação sem `--execute` passou e não enviou chamadas.

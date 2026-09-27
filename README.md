@@ -9,9 +9,10 @@ Projeto de pesquisa de pós-graduação que compara recuperação de contexto e 
 | Dev10 | Concluído: 10 documentos × 6 braços × 3 modelos = 180 respostas |
 | Coorte final | 1.000 documentos reservados, IDs e ordem congelados |
 | Preparação do Ling | 6.000/6.000 prompts válidos; nenhum documento excluído |
-| Geração final do Ling | Ainda não iniciada no último status verificado: 0/6.000 respostas |
-| Qwen e Gemma no full | Preparação/validação completa e geração ainda pendentes |
-| Testes | 262 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
+| Geração final do Ling | Iniciada pelo usuário; consulte o ledger e o status dos lotes |
+| Preparação do Gemma | 6.000/6.000 prompts válidos; maior entrada de 43.088 tokens |
+| Qwen no full | Comando de lotes pronto; calibração paga integral ainda pendente |
+| Testes | 270 aprovados, excluindo `slow` e `test_real_data.py`; Ruff e diff check aprovados |
 
 O comando dos lotes foi validado sem chamadas à API. O dev é exploratório; nenhuma hipótese foi confirmada como resultado do experimento final. Consulte o status salvo para acompanhar a execução posterior à atualização deste README.
 
@@ -34,17 +35,32 @@ uv run --locked findsum ling-batch --execute
 
 Repita o mesmo comando nas próximas sessões. Cada invocação executa **no máximo um lote de 100 documentos**, com seis braços por documento: **600 gerações, sem contar retries**. Ao concluir um lote, o processo encerra; a próxima invocação seleciona o primeiro lote incompleto. Respostas já aceitas são conferidas e preservadas.
 
+O contador do log, como `354/6000`, usa o índice global do experimento. No primeiro lote, o comando para ao completar `600/6000`; no segundo, `1200/6000`. São 600 gerações aceitas por lote; retries podem acrescentar chamadas à API.
+
 Para indicar um lote específico, use um número de 1 a 10:
 
 ```bash
 uv run --locked findsum ling-batch --batch 1 --execute
 ```
 
-Os dez lotes são partes da mesma coorte final, sem novo sorteio ou substituição de casos. Mantenha as mesmas pastas para retomar; não apague respostas nem abra uma nova pasta para repetir um lote. A conferência inicial reconta os 6.000 prompts e pode levar alguns minutos.
+Os dez lotes são partes da mesma coorte final, sem novo sorteio ou substituição de casos. Mantenha as mesmas pastas para retomar; não apague respostas nem abra uma nova pasta para repetir um lote. A conferência inicial reconta os 6.000 prompts com quatro trabalhadores locais e mostra o avanço a cada 100 prompts. Operações bloqueantes mostram atividade a cada 15 segundos; a preparação ainda pode levar alguns minutos.
 
 O executor consulta a cota ao iniciar, limita as tentativas ao saldo informado e aplica **20 chamadas por minuto**. Se houver 1.000 chamadas disponíveis, um lote de 600 deixa uma margem de 400 tentativas adicionais. Essa cota não garante disponibilidade do provedor; erros 429 do pool compartilhado ainda podem ocorrer. Evite outros clientes consumindo a mesma cota simultaneamente.
 
 O Ling usa preço máximo zero, provedor fixo e **nenhum fallback pago**. Não é necessário calibrar o Qwen ou gerar com os outros modelos para iniciar os lotes do Ling. O guia completo está em [lotes do Ling](docs/lotes-ling-full.md).
+
+## Qwen e Gemma em lotes de 100
+
+Os dois modelos usam os mesmos grupos do Ling, com pastas e retomadas independentes. O Gemma pode ser preparado localmente com `uv run --locked findsum prepare-gemma`. O Qwen exige uma calibração paga completa antes das gerações. Veja a sequência de preparação no [guia de lotes Qwen/Gemma](docs/lotes-qwen-gemma-full.md).
+
+Depois de preparados, valide sem API com `findsum qwen-batch` ou `findsum gemma-batch`. Para executar um lote:
+
+```bash
+uv run --locked findsum qwen-batch --execute
+uv run --locked findsum gemma-batch --execute
+```
+
+Execute o comando do modelo desejado e repita nas próximas sessões. Cada invocação processa no máximo um lote. Os tetos são cumulativos para os dez lotes: **US$ 18 de geração Qwen**, **US$ 9 de geração Gemma**, além de **US$ 18 separados para calibração Qwen**. Nenhum desses comandos gera com o Ling.
 
 ## Dados e desenho experimental
 
@@ -71,7 +87,7 @@ As cinco comparações são H1: C2/C1; H1b: C2/C1t; H2: C3/C2; H3: C4/C3; H4: C5
 4. Seleciona os exemplos de um banco separado. C3 mantém quatro exemplos fixos; C4 usa sorteio reprodutível; C5 usa similaridade entre documentos. As demonstrações incluem documento e resumo de referência completos.
 5. Monta os seis prompts e valida os limites antes de gerar. C1 não concatena chunks sobrepostos; C1t/C2 têm igualdade de tokens de contexto **e de prompt zero-shot**. C2–C5 recebem o mesmo contexto dentro de cada modelo.
 6. Envia os prompts ao OpenRouter e salva requests, respostas, tentativas, consumo e metadados para retomada e auditoria.
-7. Ao completar os 1.000 documentos do Ling, calcula as métricas locais e as comparações pareadas. Não produz testes de hipótese finais a cada lote de 100.
+7. Ao completar os 1.000 documentos de cada modelo, calcula as métricas locais e as comparações pareadas. Não produz testes de hipótese finais a cada lote de 100.
 
 As instruções de geração são comuns aos braços, com orientação de **até 750 palavras**, temperatura 0, top-p 1 e reasoning desativado. Seed não é enviada aos endpoints sem suporte. Código dos prompts: [prompts.py](src/findsum_rag/prompts.py).
 
@@ -139,12 +155,14 @@ Além de `ling-batch`, estão disponíveis:
 
 | Comando | Função |
 |---|---|
+| `findsum qwen-batch` / `findsum gemma-batch` | Um lote independente de 100, sem API por padrão |
+| `findsum prepare-gemma` | Preflight local reutilizando os insumos comuns do Ling |
 | `findsum verify-full` | Verifica o congelamento offline |
 | `findsum prepare` | Prepara fonte, recuperação, exemplos e prompts locais |
 | `findsum calibrate` | Faz a contagem remota do Qwen; sondas cobradas somente com `--execute` |
 | `findsum run` | Executor integrado dos três modelos, com preparação local e Qwen já calibrado |
 
-`calibrate` e `run` exigem `--allow-eval` para o conjunto final e `--execute` para enviar chamadas. **`ling-batch --execute` é o caminho atual dos lotes gratuitos** e não exige `--allow-eval`. O executor integrado não é um comando exclusivo de Qwen/Gemma; não o use como continuação automática da rodada Ling já iniciada. Consulte [full congelado](docs/full-congelado.md) antes das etapas pagas.
+`calibrate` e `run` exigem `--allow-eval` para o conjunto final e `--execute` para enviar chamadas. Os três comandos `*-batch --execute` operam a coorte final congelada e não exigem `--allow-eval`. O executor integrado não é um comando exclusivo de Qwen/Gemma; não o use como continuação automática da rodada Ling já iniciada. Consulte [full congelado](docs/full-congelado.md) antes das etapas pagas.
 
 A estimativa documentada em 26/09 para os três modelos, **incluindo todo o Ling como pago e a calibração Qwen**, foi de US$ 42,03, com reserva sugerida de US$ 60. É uma projeção baseada no dev10, não cobrança desta preparação nem garantia de custo final. Os lotes atuais do Ling continuam gratuitos. Premissas, faixas de preço e cenário de saídas longas: [orçamento](docs/orcamento-full.md).
 
@@ -162,6 +180,7 @@ O backend de geração local, seus perfis antigos e suas dependências específi
 - [Protocolo científico](docs/protocolo.md)
 - [Dataset e splits](docs/dataset.md)
 - [Operação dos lotes Ling](docs/lotes-ling-full.md)
+- [Operação dos lotes Qwen e Gemma](docs/lotes-qwen-gemma-full.md)
 - [Configuração congelada e etapas do full](docs/full-congelado.md)
 - [Dev10 e limitações observadas](docs/dev10-openrouter.md)
 - [BERTScore precisão/recall e METEOR](docs/dev10-metricas-complementares.md)

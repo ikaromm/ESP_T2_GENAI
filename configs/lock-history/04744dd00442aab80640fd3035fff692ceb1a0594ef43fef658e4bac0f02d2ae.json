@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-27T14:23:00.037124+00:00",
+  "created_at": "2026-09-27T14:20:38.080160+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -23,7 +23,7 @@
     "scripts/poc_openrouter.py": "9bfb888c2442aa745492f778de36b59077e6d1f8e41402d16995d045f3c85e48",
     "scripts/prepare_dev_openrouter.py": "330d3478aa1ad89a6a616c5e228ad01c22a598e07e2de94001a3ffd349cd0620",
     "scripts/prepare_full_openrouter.py": "4a925ef3879ec3813a04ecef601a1c1ec1e0ee4f6059ab0c8e228957e4313535",
-    "scripts/prepare_gemma_from_common.py": "fcefed001ef06beea93d89991d75789214696bfbaae84218f8663f5726ed15de",
+    "scripts/prepare_gemma_from_common.py": "24996abab3631cfa05b302ddef9484760e55d3ff67b5c5098ccc6d75205661c6",
     "scripts/prepare_ling_from_common.py": "bb1463425eea535d6c5d5487e3d9ea044d955b9704e3081a8b6fea24f71277d0",
     "scripts/prepare_qwen_remote.py": "c691cec75dc0bd1d9d392b022da940ed85d4b18eef1fe407de9d5b559843c869",
     "scripts/replay_gemma_paid.py": "b1da460ec40bae326464ff80e5b21042c4477dfc171765f84328c959b4bed6d0",
@@ -7209,5 +7209,5 @@
   "compatible_prepared_locks": [
     "c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1"
   ],
-  "lock_id": "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0"
+  "lock_id": "04744dd00442aab80640fd3035fff692ceb1a0594ef43fef658e4bac0f02d2ae"
 }

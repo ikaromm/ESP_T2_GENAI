@@ -46,3 +46,27 @@ def test_cli_run_is_non_executing_by_default(monkeypatch):
     assert seen[0][0] == "run_experiment_openrouter.py"
     assert "--execute" not in seen[0][1]
     assert "--config" not in seen[0][1]
+
+
+def test_operational_upgrade_preserves_scientific_lock_only():
+    from copy import deepcopy
+
+    from findsum_rag.full_lock import compatible_preparation
+
+    previous = {
+        "files": {"scripts/run_ling_batches.py": "old", "src/findsum_rag/prompts.py": "fixed"},
+        "cohort": ["same"],
+        "budgets_usd": {"qwen_generation": 18},
+    }
+    previous["lock_id"] = lock_digest(previous)
+    current = deepcopy(previous)
+    current["files"]["scripts/run_ling_batches.py"] = "new"
+    current["files"]["src/findsum_rag/progress.py"] = "new"
+    assert compatible_preparation(previous, current)
+    current["files"]["src/findsum_rag/prompts.py"] = "different"
+    assert not compatible_preparation(previous, current)
+    current = deepcopy(previous)
+    current["cohort"] = ["other"]
+    assert not compatible_preparation(previous, current)
+    previous["files"]["src/findsum_rag/prompts.py"] = "tampered"
+    assert not compatible_preparation(previous, previous)

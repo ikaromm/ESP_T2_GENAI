@@ -117,3 +117,12 @@ def test_calibration_dry_run_never_instantiates_api_counter(remote, tmp_path, mo
     )
     remote.main()
     assert not (tmp_path / "out").exists()
+
+
+def test_remote_prefix_keeps_prose_with_pipes(remote):
+    prose = "Financial report | page 37. Operating cash flow was positive."
+    assert remote.safe_character_prefix(prose, 40) == prose[:40]
+    text = "[1] [tabela cash]\ncomplete | 10\npartial label | 20"
+    assert remote.safe_character_prefix(text, text.index("label")) == (
+        "[1] [tabela cash]\ncomplete | 10"
+    )

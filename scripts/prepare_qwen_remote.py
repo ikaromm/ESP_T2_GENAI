@@ -11,13 +11,14 @@ import argparse
 import fcntl
 import hashlib
 import json
-import os
+import re
 import time
 from pathlib import Path
 
 from findsum_rag.config import ExperimentConfig
 from findsum_rag.examples import Example
 from findsum_rag.openrouter import OpenRouterFreeClient, OpenRouterHTTPError
+from findsum_rag.progress import activity, log
 from findsum_rag.prompts import build_prompt
 from run_prepared_paid import MAX_INPUT, money
 from screen_openrouter import save
@@ -94,7 +95,8 @@ class RemoteCounter:
                 > self.budget
             ):
                 raise ValueError("teto de calibracao atingido antes de enviar")
-            self.limiter.acquire()
+            with activity(f"Sonda Qwen {len(self.ledger) + 1}: controle de frequencia"):
+                self.limiter.acquire()
             stem = f"{key}-{attempt}"
             entry = {
                 "key": key,
@@ -107,7 +109,8 @@ class RemoteCounter:
             self.ledger.append(entry)
             save(self.ledger_path, self.ledger)
             try:
-                result = self.transport._request("/chat/completions", probe_payload(messages))
+                with activity(f"Sonda Qwen {len(self.ledger)}: aguardando API"):
+                    result = self.transport._request("/chat/completions", probe_payload(messages))
                 save(self.folder / entry["response_file"], result)
                 usage = result["usage"]
                 entry["reported_cost_usd"] = usage.get("cost")
@@ -136,6 +139,7 @@ class RemoteCounter:
                 delay = exc.retry_delay(2**attempt)
                 if exc.status not in {408, 429, 500, 502, 503, 504} or attempt == 5 or delay > 60:
                     raise
+                log(f"Sonda Qwen HTTP {exc.status}: retry em {delay:.1f}s")
                 self.sleep(delay)
                 continue
             except Exception:
@@ -144,6 +148,7 @@ class RemoteCounter:
                 raise
             entry.update(status="accepted", prompt_tokens=usage["prompt_tokens"])
             save(self.ledger_path, self.ledger)
+            log(f"Sonda aceita: {usage['prompt_tokens']} tokens; custo US$ {usage['cost']}")
             return usage["prompt_tokens"]
         raise ValueError("calibracao nao concluida")
 
@@ -161,9 +166,16 @@ def safe_character_prefix(text, end):
     line_end = text.find("\n", end)
     if line_end < 0:
         line_end = len(text)
-    if end < line_end and (" | " in text[start:line_end] or "[tabela " in text[start:line_end]):
+    # Mesma regra dos tokenizers locais: so blocos explicitamente serializados.
+    header = r"^(?:\[\d+\] )?\[tabela "
+    boundary = text.rfind("\n\n", 0, start)
+    block_start = boundary + 2 if boundary >= 0 else 0
+    table_line = bool(
+        re.match(header, text[start:line_end]) or re.search(header, text[block_start:start], re.M)
+    )
+    if end < line_end and table_line:
         result = text[:start].rstrip()
-    if result and "[tabela " in result.splitlines()[-1]:
+    if result and re.match(header, result.splitlines()[-1]):
         result = result.rsplit("\n", 1)[0].rstrip() if "\n" in result else ""
     return result
 
@@ -206,10 +218,15 @@ def main():
     parser.add_argument("--allow-eval", action="store_true")
     parser.add_argument("--execute", action="store_true", help="autoriza sondas pagas")
     args = parser.parse_args()
-    # Nao gerar a partir de artefatos mutados.
-    for path, digest in json.loads((args.prepared / "sha256.json").read_text()).items():
-        if hashlib.sha256((args.prepared / path).read_bytes()).hexdigest() != digest:
-            raise ValueError("artefato preparado alterado")
+    from findsum_rag.full_lock import verify_hashes_parallel
+
+    with activity("Qwen: conferindo insumos; nenhuma API nesta etapa"):
+        verify_hashes_parallel(
+            {
+                args.prepared / path: sha
+                for path, sha in json.loads((args.prepared / "sha256.json").read_text()).items()
+            }
+        )
     cfg = ExperimentConfig.from_yaml(args.prepared / "config.yaml")
     from full_common import selected_records
 
@@ -223,9 +240,8 @@ def main():
 
         frozen = verify_full_lock(prepared=args.prepared)
         local_report = json.loads((args.prepared / "report.json").read_text())
-        for model in ["ling-free", "gemma26"]:
-            if local_report["models"][model]["status"] != "preflight_passed":
-                raise ValueError("corrigir preflight local antes das sondas pagas")
+        if local_report.get("models", {}).get("ling-free", {}).get("status") != "preflight_passed":
+            raise ValueError("exige preparacao comum Ling integral validada")
         if args.budget_usd > money(frozen["budgets_usd"]["qwen_calibration"]):
             raise ValueError("orcamento excede teto congelado de calibracao")
     if not args.execute:
@@ -251,10 +267,12 @@ def main():
     if split == "eval":
         save(args.output / "full-lock.json", frozen)
     folder = args.output / "qwen37"
+    from run_experiment_openrouter import load_key
+
     counter = RemoteCounter(
         folder / "calibration",
         args.budget_usd,
-        OpenRouterFreeClient(os.environ["OPEN_ROUTER_KEY"], timeout=240),
+        OpenRouterFreeClient(load_key(), timeout=240),
     )
     rows = []
     for doc in common:

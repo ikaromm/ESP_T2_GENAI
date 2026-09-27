@@ -12,10 +12,12 @@ import hashlib
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 
 from findsum_rag.openrouter import OpenRouterFreeClient, OpenRouterHTTPError
+from findsum_rag.progress import activity, log
 from screen_openrouter import RequestWindow, save
 
 TARGETS = {
@@ -87,11 +89,16 @@ def validate_response(response, target, row):
         raise ValueError("resposta sem texto")
 
 
-def load_prepared(folder, name, n_docs):
+def load_prepared(folder, name, n_docs, *, validation_workers=4):
+    log(f"{name}: conferindo integridade dos artefatos em {folder}")
     hashes = json.loads((folder / "sha256.json").read_text())
-    for rel, expected in hashes.items():
-        if hashlib.sha256((folder / rel).read_bytes()).hexdigest() != expected:
-            raise ValueError(f"artefato alterado: {rel}")
+    from findsum_rag.full_lock import verify_hashes_parallel
+
+    verify_hashes_parallel(
+        {folder / rel: expected for rel, expected in hashes.items()},
+        workers=validation_workers,
+        label=f"artefatos {name}",
+    )
     selection = json.loads((folder / "selection.json").read_text())
     manifest_path = Path("data/interim/splits-liquidity.json")
     if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != selection["manifest_sha256"]:
@@ -122,16 +129,29 @@ def load_prepared(folder, name, n_docs):
         tokenizer = AutoTokenizer.from_pretrained(
             folder / name / "tokenizer", local_files_only=True
         )
-    for row in rows:
+    accepted_probes = None
+    if name == "qwen37":
+        ledger = json.loads((folder / name / "calibration/ledger.json").read_text())
+        accepted_probes = {r["key"]: r for r in ledger if r["status"] == "accepted"}
+
+    def validate_tokens(row):
         if tokenizer is not None:
             text = tokenizer.apply_chat_template(
                 row["messages"], tokenize=False, add_generation_prompt=True, enable_thinking=False
             )
             count = len(tokenizer.encode(text, add_special_tokens=False))
         else:
-            count = validate_remote_probe(folder / name / "calibration", row)
+            count = validate_remote_probe(folder / name / "calibration", row, accepted_probes)
         if count != row["prompt_tokens"] or count > MAX_INPUT:
             raise ValueError("contagem local alterada ou overflow")
+
+    log(f"{name}: validando {len(rows)} prompts com {validation_workers} trabalhadores")
+    with ThreadPoolExecutor(max_workers=validation_workers) as pool:
+        for position, _ in enumerate(pool.map(validate_tokens, rows), 1):
+            if position % 100 == 0 or position == len(rows):
+                log(
+                    f"{name}: prompts validados {position}/{len(rows)} ({position / len(rows):.0%})"
+                )
     for doc in doc_ids:
         group = {r["arm"]: r for r in rows if r["doc_id"] == doc}
         if set(group) != {"C1", "C1t", "C2", "C3", "C4", "C5"}:
@@ -143,12 +163,13 @@ def load_prepared(folder, name, n_docs):
     return rows
 
 
-def validate_remote_probe(folder, row):
+def validate_remote_probe(folder, row, accepted=None):
     """Verifica contagens medidas; nunca finge que Qwen usa tokenizer local."""
     from prepare_qwen_remote import RemoteCounter, probe_key, probe_payload
 
-    ledger = json.loads((folder / "ledger.json").read_text())
-    accepted = {r["key"]: r for r in ledger if r["status"] == "accepted"}
+    if accepted is None:
+        ledger = json.loads((folder / "ledger.json").read_text())
+        accepted = {r["key"]: r for r in ledger if r["status"] == "accepted"}
 
     def count(messages, expected_key):
         key = probe_key(messages)
@@ -305,7 +326,13 @@ def _run_locked(
                 raise ValueError("teto de gasto atingido antes de enviar")
             if max_new_calls is not None and calls_this_session >= max_new_calls:
                 raise ValueError("cota diaria consumida; retome pendencias depois")
-            limiter.acquire()
+            log(
+                f"{target[0]}: caso {index + 1}/{len(rows)} "
+                f"{row['doc_id']}/{row['arm']}; tentativa {attempt_number + 1}; "
+                "aguardando limite de requisicoes"
+            )
+            with activity("Controle de frequencia (20 requisicoes/minuto)"):
+                limiter.acquire()
             calls_this_session += 1
             stem = f"{index:04d}-{attempt_number}"
             attempt = {
@@ -322,7 +349,8 @@ def _run_locked(
             save(ledger_path, ledger)
             try:
                 started = time.monotonic()
-                response = transport._request("/chat/completions", request_payload(target, row))
+                with activity(f"API {row['doc_id']}/{row['arm']} (timeout 240s)"):
+                    response = transport._request("/chat/completions", request_payload(target, row))
                 attempt["elapsed_seconds"] = time.monotonic() - started
                 save(output / attempt["response_file"], response)
                 if "cost" in response.get("usage", {}):
@@ -343,13 +371,18 @@ def _run_locked(
                 delay = exc.retry_delay(
                     2 ** (attempt_number - (retry_start if retry_start >= 6 else 0))
                 )
+                log(
+                    f"HTTP {exc.status}; tentativa {attempt_number + 1}/{retry_end}; "
+                    f"espera indicada {delay:.1f}s"
+                )
                 if (
                     exc.status not in {408, 429, 500, 502, 503, 504}
                     or attempt_number == retry_end - 1
                     or delay > 60
                 ):
                     raise
-                sleep(delay)
+                with activity(f"Retry em {delay:.1f}s"):
+                    sleep(delay)
                 continue
             except Exception as exc:
                 attempt.update(status="audit_required", error_type=type(exc).__name__)
@@ -357,7 +390,14 @@ def _run_locked(
                 raise
             attempt["status"] = "accepted"
             save(ledger_path, ledger)
-            print(f"{index + 1}/{len(rows)} {row['doc_id']}/{row['arm']}", flush=True)
+            usage = response["usage"]
+            log(
+                f"Aceito {index + 1}/{len(rows)} {row['doc_id']}/{row['arm']}; "
+                f"{attempt['elapsed_seconds']:.1f}s; tokens "
+                f"entrada={usage['prompt_tokens']} saida={usage['completion_tokens']}; "
+                f"custo US$ {usage['cost']}; "
+                f"fim={response['choices'][0]['finish_reason']}"
+            )
             break
     return ledger
 

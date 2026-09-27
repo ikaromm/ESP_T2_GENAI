@@ -34,7 +34,7 @@ Um único ledger mantém os índices globais dos 6.000 casos, modelo, provedor, 
 
 Somente Ling gratuito/Novita, preço máximo zero, sem fallback pago. Falhas HTTP transitórias recebem até seis tentativas com espera 1/2/4/8/16 segundos e respeito a Retry-After. Após esgotar tentativas, o circuito permite uma nova rodada na retomada após uma hora. Uma falha de transporte com resultado desconhecido exige auditoria, pois repetir automaticamente poderia duplicar chamada já processada.
 
-Ao completar os 1.000 documentos, o executor calcula métricas locais e comparações no diretório `ling-free/results/`. Se as métricas falharem, repetir o comando recalcula a análise sem repetir gerações aceitas. Não são produzidos testes de hipótese finais a cada lote de 100. Qwen/Gemma continuam pendentes e usarão a mesma coorte; começar Ling não confirma que os prompts desses outros modelos já passaram pela contagem remota.
+Ao completar os 1.000 documentos, o executor calcula métricas locais e comparações no diretório `ling-free/results/`. Se as métricas falharem, repetir o comando recalcula a análise sem repetir gerações aceitas. Não são produzidos testes de hipótese finais a cada lote de 100. Qwen/Gemma têm comandos independentes e usam a mesma coorte; consulte [seu guia de preparação e execução](lotes-qwen-gemma-full.md). Começar Ling não confirma o preflight desses outros modelos.
 
 ## Preparação e congelamento
 
@@ -50,6 +50,10 @@ O executor rejeita preparação incompleta ou alterada. Não apague resultados p
 
 O primeiro preflight produziu 5.934 prompts: 11 documentos falharam no pareamento C1t/C2. O recorte confundia ` | ` dentro de prosa com linha de tabela. Corrigido para reconhecer apenas os blocos marcados pelo serializador, mantendo proteção de células e igualdade de tokens. Os 11 controles passaram na rechecagem; todos os prompts foram revalidados antes de liberar geração. Nenhum documento foi removido. Insumos e relatório inicial preservados em `outputs/full-ling-prepared-initial`; a preparação vigente usa a mesma fonte, recuperação e IDs de exemplos.
 
-Validação concluída: 6.000/6.000 prompts, 1.000/1.000 documentos, zero erros. Maior entrada: 43.743 tokens; entrada máxima permitida: 49.152; reserva de saída: 8.192; janela Ling: 262.144. Nenhum dos 5.934 prompts inicialmente válidos foi alterado. 262 testes passaram, Ruff e diff check passaram. Relatório: `outputs/full-ling-prepared/report.json`. Lock ativo: `c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1`. Nenhuma chamada de geração foi executada pelo assistente.
+Validação concluída: 6.000/6.000 prompts, 1.000/1.000 documentos, zero erros. Maior entrada: 43.743 tokens; entrada máxima permitida: 49.152; reserva de saída: 8.192; janela Ling: 262.144. Nenhum dos 5.934 prompts inicialmente válidos foi alterado. 262 testes passaram, Ruff e diff check passaram. Relatório: `outputs/full-ling-prepared/report.json`. Lock da preparação: `c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1`, aceito pelo lock operacional atual. Nenhuma chamada de geração foi executada pelo assistente.
 
 O comando real `uv run --locked findsum ling-batch` foi executado sem `--execute` e terminou com código 0: `accepted_generations=0`, `next_batch=1`, 600 chamadas pendentes no lote 1. Nenhuma consulta de cota ou geração foi realizada.
+
+## Logs e validação paralela
+
+A conferência de hashes e dos 6.000 prompts usa quatro trabalhadores locais, com avanço a cada 100 prompts e sinais de atividade a cada 15 segundos nas etapas bloqueantes. A geração mostra documento/braço, tentativas, esperas, tempo, tokens e custo. As chamadas continuam sujeitas ao controle de frequência. Uma execução iniciada antes dessa atualização mantém o código antigo; os novos logs aparecem ao executar novamente, preservando as respostas aceitas.

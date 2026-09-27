@@ -112,3 +112,51 @@ def test_transient_retry_circuit_can_resume_after_cooldown(batcher, tmp_path, mo
     )
     assert len(ledger["attempts"]) == 7
     assert ledger["attempts"][-1]["response_file"] == "0000-6.response.json"
+
+
+@pytest.mark.parametrize(
+    "command,model,cap",
+    [
+        ("qwen-batch", "qwen37", "18.0"),
+        ("gemma-batch", "gemma26", "9.0"),
+    ],
+)
+def test_paid_cli_is_independent_and_dry_by_default(monkeypatch, command, model, cap):
+    seen = []
+    monkeypatch.setattr("findsum_rag.cli._script", lambda name, args: seen.append((name, args)))
+    assert CliRunner().invoke(app, [command]).exit_code == 0
+    args = seen[0][1]
+    assert args[args.index("--model") + 1] == model
+    assert args[args.index("--budget-usd") + 1] == cap
+    assert "--execute" not in args
+    assert CliRunner().invoke(app, [command, "--batch", "11"]).exit_code != 0
+
+
+@pytest.mark.parametrize("model", ["qwen37", "gemma26"])
+def test_paid_batch_resume_keeps_cumulative_budget(batcher, tmp_path, model):
+    core = importlib.import_module("run_prepared_paid")
+    target = core.TARGETS[model]
+    rows = [{"doc_id": str(i), "arm": "C1", "messages": [], "prompt_tokens": 100} for i in range(2)]
+    calls = []
+
+    def request(route, payload):
+        calls.append(payload)
+        return {
+            "model": target[0],
+            "provider": target[2],
+            "choices": [{"message": {"content": "Summary"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 5, "cost": 0.001},
+        }
+
+    transport = SimpleNamespace(_request=request)
+    budget = core.reservation(target, rows[0]) + core.money("0.0005")
+    for _ in range(2):
+        core.run(rows, target, tmp_path, budget, {}, transport, case_indices={0})
+    assert len(calls) == 1
+    with pytest.raises(ValueError, match="teto de gasto"):
+        core.run(rows, target, tmp_path, budget, {}, transport, case_indices={1})
+    assert len(calls) == 1
+    core.run(rows, target, tmp_path, core.money(".1"), {}, transport, case_indices={1})
+    assert len(calls) == 2
+    assert batcher.accepted_cases(tmp_path, rows, {}, model) == {0, 1}
+    assert all(p["model"] == target[0] and p["provider"]["only"] == [target[1]] for p in calls)

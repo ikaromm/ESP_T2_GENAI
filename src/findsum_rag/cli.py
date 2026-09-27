@@ -108,7 +108,9 @@ def _script(name: str, arguments: list[str]) -> None:
     import sys
 
     repo = Path(__file__).resolve().parents[2]
-    result = subprocess.run([sys.executable, str(repo / "scripts" / name), *arguments], cwd=repo)
+    result = subprocess.run(
+        [sys.executable, "-u", str(repo / "scripts" / name), *arguments], cwd=repo
+    )
     if result.returncode:
         raise typer.Exit(result.returncode)
 
@@ -146,6 +148,57 @@ def ling_batch(
     if execute:
         args.append("--execute")
     _script("run_ling_batches.py", args)
+
+
+def _paid_batch(model, prepared, output, batch, budget_usd, execute):
+    args = [
+        "--model",
+        model,
+        "--prepared",
+        str(prepared),
+        "--output",
+        str(output),
+        "--budget-usd",
+        str(budget_usd),
+    ]
+    if batch is not None:
+        args.extend(["--batch", str(batch)])
+    if execute:
+        args.append("--execute")
+    _script("run_ling_batches.py", args)
+
+
+@app.command("qwen-batch")
+def qwen_batch(
+    prepared: Path = typer.Option(Path("outputs/full-qwen-prepared")),
+    output: Path = typer.Option(Path("outputs/full-qwen-batches")),
+    batch: int | None = typer.Option(None, min=1, max=10),
+    budget_usd: float = typer.Option(18.0, min=0.0),
+    execute: bool = typer.Option(False, "--execute"),
+) -> None:
+    """Qwen/Alibaba pago: um lote de 100; exige calibracao integral previa."""
+    _paid_batch("qwen37", prepared, output, batch, budget_usd, execute)
+
+
+@app.command("gemma-batch")
+def gemma_batch(
+    prepared: Path = typer.Option(Path("outputs/full-gemma-prepared")),
+    output: Path = typer.Option(Path("outputs/full-gemma-batches")),
+    batch: int | None = typer.Option(None, min=1, max=10),
+    budget_usd: float = typer.Option(9.0, min=0.0),
+    execute: bool = typer.Option(False, "--execute"),
+) -> None:
+    """Gemma/Darkbloom pago: um lote de 100, retomada e orcamento cumulativo."""
+    _paid_batch("gemma26", prepared, output, batch, budget_usd, execute)
+
+
+@app.command("prepare-gemma")
+def prepare_gemma(
+    source: Path = typer.Option(Path("outputs/full-ling-prepared")),
+    output: Path = typer.Option(Path("outputs/full-gemma-prepared")),
+) -> None:
+    """Preflight local do Gemma reutilizando fonte/RAG/exemplos congelados; sem API."""
+    _script("prepare_gemma_from_common.py", ["--source", str(source), "--output", str(output)])
 
 
 @app.command()

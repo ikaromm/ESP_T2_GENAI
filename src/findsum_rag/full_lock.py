@@ -6,6 +6,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 DEFAULT_LOCK = Path("configs/full_openrouter.lock.json")
@@ -29,6 +30,59 @@ def lock_digest(data):
     ).hexdigest()
 
 
+# Somente mudancas operacionais desta revisao. Prompts, contexto, configuracao,
+# dados, metricas e seletores continuam exigindo hashes identicos.
+OPERATIONAL_COMPATIBILITY = {
+    "src/findsum_rag/cli.py",
+    "src/findsum_rag/full_lock.py",
+    "src/findsum_rag/progress.py",
+    "scripts/run_ling_batches.py",
+    "scripts/run_prepared_paid.py",
+    "scripts/freeze_full_openrouter.py",
+    "scripts/prepare_gemma_from_common.py",
+    "scripts/prepare_qwen_remote.py",
+}
+
+
+def compatible_preparation(previous, current):
+    if previous.get("lock_id") != lock_digest(previous):
+        return False
+    scientific = (
+        "dataset_files",
+        "versions",
+        "hf_assets",
+        "wordnet_sha256",
+        "cohort",
+        "analysis_plan",
+        "supplementary_metrics",
+        "budgets_usd",
+    )
+    if any(previous.get(k) != current.get(k) for k in scientific):
+        return False
+    changed = {
+        name
+        for name in previous["files"].keys() | current["files"].keys()
+        if previous["files"].get(name) != current["files"].get(name)
+    }
+    return changed <= OPERATIONAL_COMPATIBILITY
+
+
+def verify_hashes_parallel(files, *, workers=4, label="arquivos"):
+    """Hashes em paralelo, leitura em blocos; nunca carrega pesos na memoria."""
+    from .progress import log
+
+    def check(item):
+        name, expected = item
+        if digest(name) != expected:
+            raise ValueError(f"arquivo difere do congelado: {name}")
+
+    log(f"Conferindo {len(files)} {label} com {workers} trabalhadores")
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for i, _ in enumerate(pool.map(check, files.items()), 1):
+            if i % 100 == 0 or i == len(files):
+                log(f"Integridade {label}: {i}/{len(files)}")
+
+
 def verify_full_lock(path=DEFAULT_LOCK, *, prepared=None, check_assets=True):
     from huggingface_hub.constants import HF_HUB_CACHE
 
@@ -39,9 +93,7 @@ def verify_full_lock(path=DEFAULT_LOCK, *, prepared=None, check_assets=True):
     if data.get("lock_id") != lock_digest(data):
         raise ValueError("identificador do lock invalido")
     for section in ["files", "dataset_files"]:
-        for name, expected in data[section].items():
-            if digest(name) != expected:
-                raise ValueError(f"arquivo difere do full congelado: {name}")
+        verify_hashes_parallel(data[section], label=section)
     for package, version in data["versions"].items():
         if importlib.metadata.version(package) != version:
             raise ValueError(f"versao diferente da congelada: {package}")
@@ -50,9 +102,13 @@ def verify_full_lock(path=DEFAULT_LOCK, *, prepared=None, check_assets=True):
             base = Path(HF_HUB_CACHE) / ("models--" + model.replace("/", "--"))
             if (base / "refs/main").read_text().strip() != spec["revision"]:
                 raise ValueError(f"revisao local mudou: {model}")
-            for name, expected in spec["files"].items():
-                if digest(base / "snapshots" / spec["revision"] / name) != expected:
-                    raise ValueError(f"asset local mudou: {model}/{name}")
+            verify_hashes_parallel(
+                {
+                    base / "snapshots" / spec["revision"] / name: expected
+                    for name, expected in spec["files"].items()
+                },
+                label=model,
+            )
     if data.get("wordnet_sha256"):
         import nltk
 
@@ -72,7 +128,13 @@ def verify_full_lock(path=DEFAULT_LOCK, *, prepared=None, check_assets=True):
             raise ValueError("configuracao preparada difere do full congelado")
         prepared_lock = json.loads((prepared / "full-lock.json").read_text())
         if prepared_lock["lock_id"] != data["lock_id"]:
-            raise ValueError("preparacao pertence a outro lock")
+            report = json.loads((prepared / "report.json").read_text())
+            if (
+                prepared_lock["lock_id"] not in data.get("compatible_prepared_locks", [])
+                or not compatible_preparation(prepared_lock, data)
+                or set(report.get("models", {})) != {"ling-free"}
+            ):
+                raise ValueError("preparacao pertence a outro lock")
     # Evita atualizacao automatica de main nos modelos avaliadores/tokenizers.
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"

@@ -1,0 +1,78 @@
+"""Validacao paralela conserva ordem, rejeita adulteracao e nao acessa a API."""
+
+import importlib
+import json
+import threading
+import time
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+
+def test_parallel_preflight_matches_serial_and_rejects_drift(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts"))
+    core = importlib.import_module("run_prepared_paid")
+    common = importlib.import_module("full_common")
+    from findsum_rag.full_lock import digest
+
+    monkeypatch.chdir(tmp_path)
+    manifest = Path("data/interim/splits-liquidity.json")
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{}")
+    folder = tmp_path / "prepared"
+    (folder / "ling-free").mkdir(parents=True)
+    (folder / "selection.json").write_text(
+        json.dumps(
+            {
+                "manifest_sha256": digest(manifest),
+                "documents": [{"doc_id": "a"}],
+            }
+        )
+    )
+    (folder / "sha256.json").write_text("{}")
+    rows = [
+        {
+            "doc_id": "a",
+            "arm": arm,
+            "context": "same",
+            "context_tokens": 4,
+            "messages": [{"role": "user", "content": "same"}],
+            "prompt_tokens": 4,
+        }
+        for arm in common.ARMS
+    ]
+    preflight = folder / "ling-free/preflight.json"
+    preflight.write_text(json.dumps(rows))
+    monkeypatch.setattr(common, "selected_records", lambda _: ("eval", [{"doc_id": "a"}]))
+    threads = set()
+
+    def encode(text, **kwargs):
+        threads.add(threading.get_ident())
+        time.sleep(0.01)
+        return list(text)
+
+    tokenizer = SimpleNamespace(
+        apply_chat_template=lambda messages, **kwargs: messages[0]["content"],
+        encode=encode,
+    )
+    monkeypatch.setattr("transformers.AutoTokenizer.from_pretrained", lambda *a, **k: tokenizer)
+    assert core.load_prepared(folder, "ling-free", 1, validation_workers=1) == rows
+    threads.clear()
+    assert core.load_prepared(folder, "ling-free", 1, validation_workers=4) == rows
+    assert len(threads) > 1
+    rows[-1]["prompt_tokens"] = 5
+    preflight.write_text(json.dumps(rows))
+    with pytest.raises(ValueError, match="contagem local alterada"):
+        core.load_prepared(folder, "ling-free", 1, validation_workers=4)
+
+
+def test_heartbeat_exits_on_error(capsys):
+    from findsum_rag.progress import activity
+
+    with pytest.raises(ValueError), activity("Validacao", interval=0.005):
+        time.sleep(0.02)
+        raise ValueError("private payload")
+    output = capsys.readouterr().out
+    assert "em andamento" in output and "interrompido" in output
+    assert "private payload" not in output

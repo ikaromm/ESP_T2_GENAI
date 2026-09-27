@@ -8,13 +8,20 @@ from pathlib import Path
 
 from huggingface_hub.constants import HF_HUB_CACHE
 
-from findsum_rag.full_lock import DEFAULT_LOCK, digest, lock_digest, verify_full_lock
+from findsum_rag.full_lock import (
+    DEFAULT_LOCK,
+    compatible_preparation,
+    digest,
+    lock_digest,
+    verify_full_lock,
+)
 from full_common import random_records
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--compatible-prepared-lock", type=Path)
     args = parser.parse_args()
     if args.verify:
         result = verify_full_lock()
@@ -108,6 +115,12 @@ def main():
             ]
         },
     }
+    result = json.loads(json.dumps(result))
+    if args.compatible_prepared_lock:
+        previous = json.loads(args.compatible_prepared_lock.read_text())
+        if not compatible_preparation(previous, result):
+            raise ValueError("mudanca cientifica impede reaproveitar preparacao anterior")
+        result["compatible_prepared_locks"] = [previous["lock_id"]]
     result["lock_id"] = lock_digest(result)
     DEFAULT_LOCK.write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print("Congelado:", result["lock_id"], len(cohort), "casos; 0 chamadas API")
