@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-28T20:52:22.763583+00:00",
+  "created_at": "2026-09-27T17:52:07.805790+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -26,7 +26,7 @@
     "scripts/execution/run_full_round.py": "453d68afc5dfd421c565f4361d8c5289db097045296298e940875d665f6499c1",
     "scripts/execution/run_ling_batches.py": "ce820a2a975bb382d4f0fc286bd30d4c678419bc69c0c663b981d5f0d20f29ad",
     "scripts/execution/run_paid_concurrent.py": "52abc0f6146c94011d96bb22088c4d15feb2545f973a828edf3af7d3c2fc3253",
-    "scripts/execution/run_prepared_paid.py": "e98f83f335e412b5008e25acebbd3c3ced8a7ef8364818becda523202f84ae37",
+    "scripts/execution/run_prepared_paid.py": "82cc15fe0ca5899c6014bda67fdcc37416054fed59160f0d60aecb9844ec4c0f",
     "scripts/experiments/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/experiments/benchmark_paid_rates.py": "cccee57ba1532c0c0b6d6ec43d561b6e195d15c6b97fba07e07e4f4f4c2fa8fa",
     "scripts/experiments/budget_full_openrouter.py": "7692cbbd4ed430278eb973f8b6017d25f749c104282189f3f28235eb392ee8d4",
@@ -7237,5 +7237,5 @@
       "qwen37"
     ]
   },
-  "lock_id": "6fe39187cdfd48f7213576a27607b133614edaaa920c7834ee7108c36cd92f7e"
+  "lock_id": "69e22b7fd2d3c4eaee65224f0c30af6733c8d379d33c0ecf04d53dde97bc8370"
 }

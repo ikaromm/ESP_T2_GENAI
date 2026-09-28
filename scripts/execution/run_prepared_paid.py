@@ -375,17 +375,25 @@ def _run_locked(
                     attempt["reported_cost_usd"] = response["usage"]["cost"]
                 validate_response(response, target, row)
             except OpenRouterHTTPError as exc:
+                free_unavailable = (
+                    target[0].endswith(":free")
+                    and exc.status == 404
+                    and "unavailable for free" in str(exc.details.get("message", "")).lower()
+                )
                 attempt.update(
                     status=(
                         "http429"
                         if exc.status == 429
                         else "http_retryable"
-                        if exc.status in {408, 500, 502, 503, 504}
+                        if exc.status in {408, 500, 502, 503, 504} or free_unavailable
                         else "rejected"
                     ),
                     error=exc.details,
                 )
                 save(ledger_path, ledger)
+                if free_unavailable:
+                    log("Endpoint gratuito indisponivel; retomar quando voltar ao catalogo")
+                    raise
                 delay = exc.retry_delay(
                     2 ** (attempt_number - (retry_start if retry_start >= 6 else 0))
                 )

@@ -12,6 +12,7 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 - [Interpretação dos primeiros 100 documentos](docs/metricas-primeiros100-20260927.md)
 - [Snapshot dos scores e IDs dos primeiros 100](results/first100-20260927/)
 - [Como as métricas são atualizadas](docs/metricas-automaticas.md)
+- [Rodada 161–320 de 28/09: execução pendente pelo Ling gratuito](results/progress/rodada-161-320-20260928.md)
 
 ## Executar uma rodada
 
@@ -26,7 +27,7 @@ bash rodar_rodada.sh --metrics-only # atualiza apenas métricas e painel, sem AP
 
 A preparação integral já existe neste workspace em `outputs/full-{ling,qwen,gemma}-prepared`. Uma nova instalação precisa do dataset, dos modelos locais e desses artefatos preparados; eles não estão no Git. O caminho da credencial é `../.env`, variável `OPEN_ROUTER_KEY`. Nunca adicione esse arquivo ao repositório.
 
-Cada grupo de 100 documentos tem **600 gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 160 estão concluídos; a próxima rodada começa no documento 161 da ordem congelada.
+Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 160 estão concluídos; a rodada dos documentos 161–320 está em andamento e será retomada na próxima execução.
 
 A execução normal envia chamadas pagas de Qwen/Gemma. `--dry-run`, `--metrics-only` e `--audit-ling-batch 1` são modos locais. Não apague `outputs/full-rounds/active-round.json`, os ledgers ou as pastas de respostas para tentar avançar.
 

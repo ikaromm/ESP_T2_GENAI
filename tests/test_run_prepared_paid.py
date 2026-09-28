@@ -99,6 +99,36 @@ def test_six_429_attempts_do_not_silently_complete_on_resume(runner, tmp_path):
     assert waits == [1, 2, 4, 8, 16]
 
 
+def test_unavailable_free_endpoint_waits_for_later_resume(runner, tmp_path):
+    target = runner.TARGETS["ling-free"]
+    calls = []
+
+    def unavailable(*args):
+        calls.append(args)
+        raise runner.OpenRouterHTTPError(
+            {"http_status": 404, "message": "This model is unavailable for free.", "headers": {}}
+        )
+
+    with pytest.raises(runner.OpenRouterHTTPError):
+        runner.run(
+            [row()], target, tmp_path, runner.money(0), {}, SimpleNamespace(_request=unavailable)
+        )
+    assert len(calls) == 1
+    ledger = json.loads((tmp_path / "ledger.json").read_text())
+    assert ledger["attempts"][0]["status"] == "http_retryable"
+
+    runner.run(
+        [row()],
+        target,
+        tmp_path,
+        runner.money(0),
+        {},
+        SimpleNamespace(_request=lambda *args: response(target, cost=0)),
+    )
+    ledger = json.loads((tmp_path / "ledger.json").read_text())
+    assert [a["status"] for a in ledger["attempts"]] == ["http_retryable", "accepted"]
+
+
 @pytest.mark.parametrize(
     "usage",
     [

@@ -171,14 +171,14 @@
       "complete_documents": 160
     },
     "qwen37": {
-      "accepted": 960,
+      "accepted": 1920,
       "length": 0,
-      "complete_documents": 160
+      "complete_documents": 320
     },
     "gemma26": {
-      "accepted": 960,
-      "length": 5,
-      "complete_documents": 160
+      "accepted": 1917,
+      "length": 17,
+      "complete_documents": 319
     }
   },
   "models": {
@@ -324,9 +324,9 @@
     "scripts/evaluation/update_progress_metrics.py": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93"
   },
   "ledger_sha256": {
-    "ling-free": "d3cb57ffe934df50d0c2bfb816532b5d539c36725b4a423462cee9f73da5b46a",
-    "qwen37": "48c646eac5f6f49f4d3b832cb8e0229d560bf8aed275070d652c33ef2736a12a",
-    "gemma26": "0b21ad2ac31553332222a907f61a6572b17b1cd485b77e9d1fec4fb394dd5cc9"
+    "ling-free": "e5d2d1fe38b360b13e81478a464c2b1355fccb16b73b7aa5cf130d1090dd2472",
+    "qwen37": "6e0a360c952aa92b1a26d5cc3a7fc81fc3a3a2cdd9d6ce627e75dcd1a1a3d4d7",
+    "gemma26": "952e28492fcc4e01640597dac6a2d2c2d20003140b9ecf603290601fcab1aae4"
   },
   "hypotheses_tested": false,
   "token_audit": [
