@@ -1,6 +1,6 @@
 # FINDSum: sumarização financeira com RAG e few-shot
 
-Projeto de pós-graduação que compara seis configurações de sumarização no **FINDSum Liquidity**. Preparação, recuperação e métricas são locais; a geração usa a API do **OpenRouter**.
+Projeto de pós-graduação que compara **seis configurações** de sumarização e **cinco contrastes planejados** no **FINDSum Liquidity**. Preparação, recuperação e métricas são locais; a geração usa a API do **OpenRouter**. O objetivo é medir a semelhança dos resumos gerados com as referências do FINDSum, mantendo documentos e instruções comparáveis entre os braços.
 
 ## Resultados
 
@@ -121,26 +121,64 @@ Os HTMLs gerados ficam em `outputs/reports/`. Notas de execução, diagnósticos
 
 ## Método do experimento
 
-FINDSum Liquidity, em inglês: 1.000 exemplos, 500 documentos dev e 1.000 eval, separados por empresa no [manifesto](data/interim/splits-liquidity.json). A [coorte final](configs/full-eval-cohort.csv) tem ordem sorteada com semente 42, sem reposição ou seleção por qualidade. “Fonte inteira” é o extrato disponível no FINDSum, com prosa e tabelas brutas da tarefa, não o 10-K original completo.
+### Dados, partição e ordem dos documentos
 
-| Braço | Contexto e exemplos |
+Usamos os trechos selecionados e os resumos de referência em inglês da tarefa **Liquidity** do FINDSum. Os splits originais `train`, `val` e `test` foram reunidos antes da partição deste estudo. Registros sem resumo utilizável ou com menos de 100 palavras na referência foram descartados; para cada empresa, foi mantido deterministicamente o relatório mais recente. A semente 42 distribuiu empresas distintas entre **1.000 pares de exemplos**, **500 documentos dev** e **1.000 documentos eval**. Os IDs, a origem de cada registro e a partição estão no [manifesto congelado](data/interim/splits-liquidity.json). Dev foi usado para validar a pipeline; eval é a coorte reservada para os resultados do artigo. Esta repartição impede que relatórios da mesma empresa cruzem esses conjuntos, mas não permite comparar diretamente nossos números com resultados publicados para o split oficial do FINDSum.
+
+A ordem de execução de eval foi sorteada **sem reposição** com a semente `cohort:42:eval` e está registrada, com os IDs, em [full-eval-cohort.csv](configs/full-eval-cohort.csv). Como eval contém exatamente 1.000 documentos e o experimento usa os 1.000, o sorteio altera **a ordem dos lotes**, não a composição da amostra. Os lotes de 100 seguem essa ordem congelada; falhas são retomadas no mesmo documento, sem substituir casos difíceis por outros. O painel de resultados usa apenas o prefixo consecutivo concluído nos **seis braços dos três modelos**, de modo que todas as médias do recorte se referem aos mesmos documentos.
+
+### O que entra em cada braço
+
+“Fonte inteira” significa a **entrada disponível no FINDSum**, composta pela prosa limpa selecionada pelo dataset e pelas tabelas brutas da seção Liquidity serializadas; não é o formulário 10-K original completo. A prosa de C1 não é montada pela concatenação dos chunks sobrepostos, evitando duplicação. A serialização mantém os valores brutos das células com conteúdo, inclusive ambiguidades; não fazemos correção financeira prévia ou filtro por valor.
+
+| Braço | Evidência do documento-alvo | Demonstrações de outros documentos |
+|---|---|---|
+| C1 | Fonte inteira disponível | Nenhuma |
+| C1t | Prefixo da fonte inteira, ajustado ao orçamento de C2 | Nenhuma |
+| C2 | Trechos selecionados por RAG | Nenhuma |
+| C3 | Mesmo contexto de C2 | Quatro exemplos fixos |
+| C4 | Mesmo contexto de C2 | Quatro exemplos sorteados por documento |
+| C5 | Mesmo contexto de C2 | Quatro exemplos similares ao documento-alvo |
+
+C1t e C2 têm **a mesma contagem de tokens de evidência e do prompt zero-shot completo**, aferida com o tokenizador de cada modelo. Assim, H1b compara o conteúdo selecionado pelo RAG com um prefixo sob o mesmo orçamento. C2–C5 recebem **exatamente o mesmo texto recuperado dentro de cada modelo**; somente as demonstrações mudam. Como o corte usa o tokenizador de cada modelo, o contexto final pode diferir entre Ling, Qwen e Gemma.
+
+### Como o RAG recupera a evidência
+
+O índice de contexto é construído **separadamente para cada relatório-alvo**; não consulta relatórios de outras empresas. Os trechos de prosa já delimitados pelo FINDSum são preservados e os maiores são divididos em janelas de **220 palavras com sobreposição de 40**. As tabelas da seção Liquidity viram trechos próprios, mantendo cada linha/célula inteira. O índice contém trechos da prosa e dessas tabelas, mas só os selecionados e comportados no orçamento chegam ao prompt RAG.
+
+O codificador local `sentence-transformers/all-MiniLM-L6-v2` produz embeddings normalizados; textos longos são processados em janelas e agregados, cobrindo toda a prosa. O FAISS `IndexFlatIP` faz busca exata por similaridade de cosseno. **A consulta do RAG é o embedding da instrução da tarefa Liquidity** (fluxos de caixa, crédito, dívida e mudanças entre períodos), igual em texto para todos os alvos. A busca retorna até **12 trechos do próprio relatório**, em ordem de similaridade. O contexto entregue é cortado em no máximo **3.072 tokens de evidência**, respeitando linhas de tabela; C1t é ajustado ao mesmo tamanho efetivo. Esta recuperação seleciona evidência para resumir o alvo e é distinta da busca de exemplos de C5.
+
+### Como os quatro exemplos são escolhidos
+
+O banco few-shot contém apenas pares **prosa do relatório + resumo de referência** do conjunto `examples`, sem tabelas. Cada demonstração mostra o texto e o resumo integral desse outro documento; a configuração atual não aplica corte de palavras aos exemplos. **A referência do documento avaliado nunca aparece no prompt nem no índice.** Os quatro `doc_id` escolhidos por braço e por alvo ficam gravados nos artefatos preparados, permitindo identificar exatamente o que o modelo recebeu.
+
+| Braço | Regra de escolha dos quatro exemplos |
 |---|---|
-| C1 | Fonte inteira, sem exemplos |
-| C1t | Prefixo com orçamento de contexto e prompt zero-shot iguais aos de C2 |
-| C2 | Contexto recuperado por RAG, sem exemplos |
-| C3 | Mesmo RAG + quatro exemplos fixos |
-| C4 | Mesmo RAG + quatro exemplos aleatórios, com semente por documento |
-| C5 | Mesmo RAG + quatro exemplos por similaridade |
+| C3, fixos | Os quatro primeiros `doc_id` do banco de exemplos em ordem alfabética; os mesmos para todos os alvos. |
+| C4, aleatórios | Para cada `doc_id` avaliado, `random.Random(f"42:{doc_id}").sample(pool, 4)`: sorteio **sem reposição** no banco de exemplos, excluindo o próprio ID. O resultado muda entre alvos, mas se repete em retomadas e nos três modelos. |
+| C5, similares | Embedding da **prosa integral do alvo** comparado aos embeddings das prosas integrais dos exemplos no FAISS; entram os quatro mais similares, excluindo o próprio ID. Os resumos de referência não participam da busca. |
 
-RAG local com MiniLM-L6-v2, FAISS, chunks de 220 palavras, sobreposição de 40, até 12 chunks e orçamento de contexto de 3.072 tokens. Embeddings em janelas cobrem toda a prosa. A referência do alvo não entra na recuperação ou no prompt; os exemplos vêm de banco separado. C2–C5 compartilham o contexto recuperado dentro de cada modelo.
+O sorteio de C4 é independente do sorteio que definiu a **ordem da coorte eval**. C4 sorteia exemplos *para cada alvo*; não sorteia novos documentos de avaliação nem refaz o sorteio a cada chamada da API. C3, C4 e C5 usam o mesmo RAG de C2, isolando na comparação a regra de escolha das demonstrações.
 
-Prompts orientam até 750 palavras; reserva de saída de 8.192 tokens. Todos os prompts são pré-validados; overflow bloqueia a execução, sem truncar C1, exemplos ou instruções. Saídas `length` são mantidas e sinalizadas. Não repetir respostas por baixa qualidade.
+### Prompt, geração e limites
 
-As métricas primárias são **BERTScore F1 e ROUGE-L F1**; BERTScore precisão/recall, ROUGE-1/2 e METEOR são descritivas. BERTScore usa XLNet-base-cased, camada 5, sem IDF/reescala e com auditoria de cobertura integral, sem corte em 512 tokens. Similaridade não é porcentagem de correção factual; não há avaliação numérica ou revisão humana no protocolo atual.
+Os seis braços usam as mesmas instruções de sistema e da tarefa Liquidity; variam apenas o conteúdo de `TARGET_REPORT` e a presença/seleção de `EXAMPLES`. As instruções estão em inglês e dizem que exemplos demonstram estilo e **não são evidência sobre o alvo**; pedem prosa contínua com até **750 palavras**, fidelidade a valores e períodos, e omissão de afirmações sem suporte. Cada modelo gera via OpenRouter com provedor fixado, `temperature=0`, `top_p=1`, reasoning desligado, sem fallback e sem enviar `seed`. Temperatura zero não garante respostas idênticas se uma requisição precisar ser refeita.
 
-Contrastes: **H1=C2−C1; H1b=C2−C1t; H2=C3−C2; H3=C4−C3; H4=C5−C4.** Na análise final: Wilcoxon bilateral, Holm sobre dez testes por modelo (cinco contrastes × duas métricas), alfa 0,05; dados incompletos são rejeitados. H3 é controle de sensibilidade: não significância não demonstra equivalência. Nenhuma hipótese está confirmada pelo recorte parcial. A avaliação usa empresas reservadas dentro do FINDSum, não demonstra generalização para outro corpus.
+Antes da geração, os **6.000 prompts de cada modelo** (1.000 alvos × seis braços) são montados e validados com seu tokenizador: até **49.152 tokens de entrada**, **8.192 reservados para saída** e **256 de margem** dentro da janela do endpoint. Um prompt que exceda o limite bloqueia a execução; não há corte silencioso de C1, exemplos ou instruções para fazê-lo caber. O orçamento de 3.072 tokens aplica-se só ao contexto RAG e ao controle C1t, não à fonte inteira de C1. Respostas com término `length` permanecem no conjunto, com sinalização; não repetimos uma geração só porque o resumo parece fraco. A política de retries cobre falhas transitórias da API e preserva respostas já aceitas.
 
-Coorte, parâmetros e versões permanecem congelados. Não ajustar o protocolo com base nas métricas parciais da avaliação. [Configuração científica](configs/full_openrouter.yaml) · [Modelos e limites](configs/openrouter_full.json).
+### Hipóteses, métricas e alcance dos resultados
+
+Os **cinco contrastes pré-definidos** estão na [tabela de hipóteses e observações parciais](#hipóteses-e-observações-parciais): H1 (`C2−C1`) pergunta se selecionar trechos supera usar toda a fonte; H1b (`C2−C1t`) separa a **seleção** do efeito de reduzir o tamanho do contexto; H2 (`C3−C2`) testa acrescentar quatro exemplos fixos; H3 (`C4−C3`) mede a sensibilidade à troca dos exemplos fixos por sorteados; H4 (`C5−C4`) compara seleção por similaridade com sorteio. H3 não é teste de equivalência: um resultado sem significância não demonstra que C3 e C4 sejam iguais.
+
+As métricas primárias são **BERTScore F1 e ROUGE-L F1** contra o resumo de referência de cada alvo. BERTScore precisão/recall, ROUGE-1/2 e METEOR são descritivas. BERTScore usa `xlnet-base-cased`, camada 5, sem IDF/reescala e com cobertura do texto integral por janelas, sem corte definitivo em 512 tokens. Diferenças são medidas nos **mesmos documentos** em cada par de braços e para cada modelo separadamente. Somente após completar os 1.000 documentos, a análise confirmatória usa **Wilcoxon bilateral emparelhado**, correção **Holm nos dez testes por modelo** (cinco contrastes × duas métricas), alfa 0,05, e rejeita dados incompletos. As médias e os gráficos atuais são descritivos; nenhuma hipótese está confirmada pelo recorte parcial.
+
+Essas métricas estimam semelhança com a referência, **não a porcentagem de fatos corretos**. O protocolo atual não inclui avaliação numérica separada nem revisão humana. Os resultados dizem respeito a empresas reservadas **dentro do FINDSum**, sem demonstrar generalização para outro corpus. Também não atribuímos diferenças entre modelos apenas à arquitetura: tokenizadores e provedores variam.
+
+### Rastro de reprodução
+
+O [manifesto](data/interim/splits-liquidity.json), a [ordem da coorte](configs/full-eval-cohort.csv), a [configuração científica](configs/full_openrouter.yaml), os [modelos e limites](configs/openrouter_full.json), o [lock](configs/full_openrouter.lock.json), o código e as [métricas individuais versionadas](results/progress/scores.csv) registram seleção, parâmetros e resultados. Localmente, `outputs/full-{ling,qwen,gemma}-prepared/` conserva textos de entrada, contextos, IDs dos exemplos, prompts, contagens de tokens e preflight; `outputs/full-{ling,qwen,gemma}-batches/` conserva tentativas e respostas, e `outputs/full-rounds/` registra os planos de execução. O dataset bruto e esses artefatos locais **não estão no Git**: os resultados exatos não podem ser recalculados apenas a partir de um clone, sem o dataset e as respostas arquivadas. A publicação externa desses artefatos ainda depende do depósito planejado.
+
+Coorte, parâmetros e versões permanecem congelados. Não ajustamos o protocolo com base nas métricas parciais de eval. `findsum verify-full` valida o lock antes de gerar ou recalcular os resultados.
 
 ## Verificação
 
