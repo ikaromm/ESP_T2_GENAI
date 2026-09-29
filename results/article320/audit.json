@@ -1,0 +1,64 @@
+{
+  "scope": "first_320_eval_documents",
+  "documents": 320,
+  "accepted_responses": 5760,
+  "scores": 5760,
+  "scores_snapshot_sha256": "a6af51d94a690746448a91047b23c69006856f312d01df1e0eef16374c1d5edf",
+  "lineage_checks": 5760,
+  "truncated_bert_texts": 0,
+  "company_split_overlap": 0,
+  "model_checks": {
+    "ling-free": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "47a1ccb6e1efc6f647cdd30f30137d3887eeb94cbf20d141bf0f586d70806a1a",
+      "first_320_accepted_ledger_sha256": "95cf2af2014c4326174b1ccd5f6d916ca1af638c1470f632c5e60bb672f0480e",
+      "accepted": 1920,
+      "finish_reasons": {
+        "stop": 1917,
+        "length": 3
+      },
+      "request_models": {
+        "inclusionai/ling-3.0-flash-fin:free": 960,
+        "inclusionai/ling-3.0-flash-fin": 960
+      },
+      "reported_cost_usd": 0.773735626,
+      "maximum_preflight_prompt_tokens": 43743
+    },
+    "qwen37": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "b0b73db554e250b5fe0c7e0e82c6bab73fae4ac878443523b8cabf9c5c919ae7",
+      "first_320_accepted_ledger_sha256": "f1c73e434bd36e87dff67f2fbd106b007110d2747404645c01703a6e2387ba30",
+      "accepted": 1920,
+      "finish_reasons": {
+        "stop": 1920
+      },
+      "request_models": {
+        "qwen/qwen3.7-flash": 1920
+      },
+      "reported_cost_usd": 3.257284796,
+      "maximum_preflight_prompt_tokens": 43338
+    },
+    "gemma26": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "0831355414b473df412c1525ab9f2b98493a97ccf68e2865e03f75ace5276db9",
+      "first_320_accepted_ledger_sha256": "4f864df22186451985caccd61aa02187dad2a9515dd60edfd38f207e7512bde8",
+      "accepted": 1920,
+      "finish_reasons": {
+        "length": 17,
+        "stop": 1903
+      },
+      "request_models": {
+        "google/gemma-4-26b-a4b-it": 1920
+      },
+      "reported_cost_usd": 2.016514644,
+      "maximum_preflight_prompt_tokens": 43088
+    }
+  },
+  "raw_manifest_sha256": "33dd089b07213d8c5bd11e56d4298c3e0cd34153f04032ed5c3449f1272040e6",
+  "limitations": [
+    "Raw requests/responses and prepared artifacts are local in outputs and not in Git.",
+    "BERTScore is not recomputed here; a full metric rerun is available via --metrics-only.",
+    "Embeddings and FAISS retrieval are not recomputed here; frozen prepared artifacts, prompts, and code tests are checked.",
+    "Factual correctness and numeric preservation are not evaluated by the current scores."
+  ]
+}

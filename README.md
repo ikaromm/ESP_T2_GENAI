@@ -6,9 +6,10 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 
 ![Acompanhamento FINDSum](results/progress/dashboard.png)
 
-**320 documentos concluídos nos três modelos: 5.760 respostas e scores.** Nas médias descritivas de BERTScore F1 e ROUGE-L, C1 supera C2, C2 supera C1t e C4/C5 melhoram em relação aos braços few-shot anteriores nos três modelos. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
+**320 documentos concluídos nos três modelos: 5.760 respostas e scores.** Nas médias descritivas de BERTScore F1 e ROUGE-L, C1 supera C2, C2 supera C1t, C3 fica abaixo de C2 e C4 supera C3 nos três modelos. O ganho de C5 sobre C4 é menor. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
 
 - [Painel atual, tabela e evolução cumulativa](results/progress/README.md)
+- [Auditoria dos 320 documentos e figura dos cinco contrastes](results/article320/README.md)
 - [Interpretação dos primeiros 100 documentos](docs/metricas-primeiros100-20260927.md)
 - [Snapshot dos scores e IDs dos primeiros 100](results/first100-20260927/)
 - [Como as métricas são atualizadas](docs/metricas-automaticas.md)
