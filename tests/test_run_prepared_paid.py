@@ -129,6 +129,32 @@ def test_unavailable_free_endpoint_waits_for_later_resume(runner, tmp_path):
     assert [a["status"] for a in ledger["attempts"]] == ["http_retryable", "accepted"]
 
 
+def test_paid_ling_saved_response_requires_matching_round_amendment(runner, tmp_path):
+    _, amendment_sha = runner.paid_ling_amendment()
+    target = runner.TARGETS["ling-paid-novita"]
+    (tmp_path / "0960-1.request.json").write_text(
+        json.dumps(runner.request_payload(target, row()))
+    )
+    (tmp_path / "0960-1.response.json").write_text(json.dumps(response(target)))
+    entry = {
+        "case": 960,
+        "response_file": "0960-1.response.json",
+        "amendment_sha256": amendment_sha,
+    }
+    assert (
+        runner.target_for_saved_attempt(runner.TARGETS["ling-free"], tmp_path, entry, row())
+        == target
+    )
+    with pytest.raises(ValueError, match="adendo"):
+        runner.target_for_saved_attempt(
+            runner.TARGETS["ling-free"], tmp_path, entry | {"amendment_sha256": "wrong"}, row()
+        )
+    with pytest.raises(ValueError, match="adendo"):
+        runner.target_for_saved_attempt(
+            runner.TARGETS["ling-free"], tmp_path, entry | {"case": 959}, row()
+        )
+
+
 @pytest.mark.parametrize(
     "usage",
     [

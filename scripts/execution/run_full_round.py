@@ -24,7 +24,11 @@ from scripts.execution.run_ling_batches import (
     output_lock,
     run_selection,
 )
-from scripts.execution.run_prepared_paid import TARGETS, request_payload
+from scripts.execution.run_prepared_paid import (
+    TARGETS,
+    paid_ling_amendment,
+    target_for_saved_attempt,
+)
 from scripts.experiments.screen_openrouter import save
 
 MODELS = ("ling-free", "gemma26", "qwen37")
@@ -101,14 +105,12 @@ def audit_batch(state, batch=1):
         attempts = json.loads(path.read_text())["attempts"] if path.exists() else []
         selected = [entry for entry in attempts if entry["case"] in indices]
         for entry in selected:
-            response_path = state.folder / entry["response_file"]
-            request_path = response_path.with_name(
-                response_path.name.replace(".response.", ".request.")
-            )
-            if json.loads(request_path.read_text()) != request_payload(
-                TARGETS[state.model], state.rows[entry["case"]]
-            ):
-                raise ValueError("request do historico difere do prompt congelado")
+            try:
+                target_for_saved_attempt(
+                    TARGETS[state.model], state.folder, entry, state.rows[entry["case"]]
+                )
+            except ValueError as exc:
+                raise ValueError("request do historico difere do prompt congelado") from exc
         successes = [entry for entry in selected if entry["status"] == "accepted"]
         if len({entry["case"] for entry in successes}) != len(successes):
             raise ValueError("mais de uma resposta aceita para o mesmo caso")
@@ -207,7 +209,20 @@ def inspect_models(records):
     return states, accepted
 
 
-def execute_round(plan, records, states, accepted, frozen, root):
+def paid_ling_for_plan(plan, records):
+    amendment, amendment_sha = paid_ling_amendment()
+    indices = document_indices(records, plan["documents"])
+    if (
+        amendment["plan_id"] != plan["plan_id"]
+        or amendment["cohort_sha256"] != plan["cohort_sha256"]
+        or plan["documents"] != [r["doc_id"] for r in records[160:320]]
+        or indices != set(range(amendment["first_case"], amendment["last_case_exclusive"]))
+    ):
+        raise ValueError("rodada ativa difere do adendo pago autorizado")
+    return amendment_sha
+
+
+def execute_round(plan, records, states, accepted, frozen, root, *, paid_ling=None):
     errors = {}
     stop_event = Event()
 
@@ -219,8 +234,13 @@ def execute_round(plan, records, states, accepted, frozen, root):
                 states[model] = load_model(model, *paths(model))
                 if states[model].records != records:
                     raise ValueError("coorte preparada diverge")
+            kwargs = {"paid_ling": paid_ling} if model == "ling-free" and paid_ling else {}
             run_selection(
-                states[model], documents=plan["documents"], execute=True, stop_event=stop_event
+                states[model],
+                documents=plan["documents"],
+                execute=True,
+                stop_event=stop_event,
+                **kwargs,
             )
         except Exception as exc:
             error = {"type": type(exc).__name__}
@@ -280,6 +300,11 @@ def main():
         choices=range(1, 11),
         help="somente auditoria local do lote Ling indicado",
     )
+    parser.add_argument(
+        "--ling-paid-this-round",
+        action="store_true",
+        help="usa adendo autorizado de Ling pago apenas na rodada ativa 161-320",
+    )
     args = parser.parse_args()
     if args.audit_ling_batch:
         state = load_model("ling-free")
@@ -290,6 +315,8 @@ def main():
     log(
         "MODO SEM API"
         if args.dry_run or args.metrics_only
+        else "MODO EXECUCAO: Ling pago Novita nesta rodada + Gemma/Qwen pagos"
+        if args.ling_paid_this_round
         else "MODO EXECUCAO: Ling gratuito + Gemma/Qwen pagos; preparacao Qwen sem API"
     )
     with output_lock(ROOT):
@@ -300,6 +327,8 @@ def main():
             update_metrics(records, states)
             return
         audit_batch(states["ling-free"], 1)
+        if args.ling_paid_this_round and not (ROOT / "active-round.json").exists():
+            raise ValueError("adendo Ling pago exige a rodada ativa 161-320")
         plan = round_plan(ROOT, records, accepted, args.cases, persist=not args.dry_run)
         if plan is None:
             log("Os tres modelos ja concluiram todos os documentos; nenhuma geracao pendente")
@@ -307,6 +336,7 @@ def main():
                 update_metrics(records, states)
             return
         pending = remaining(records, plan["documents"], accepted)
+        paid_ling = paid_ling_for_plan(plan, records) if args.ling_paid_this_round else None
         preview = {
             "plan": plan,
             "pending_generations": pending,
@@ -315,11 +345,14 @@ def main():
         }
         save(ROOT / "preview.json", preview)
         log(f"Rodada de {len(plan['documents'])} documentos; pendencias: {pending}")
-        log("Tetos cumulativos: Ling US$0; Gemma US$9; Qwen geracao US$18; preparacao local US$0")
+        log(
+            f"Tetos cumulativos: Ling US${'2' if paid_ling else '0'}; "
+            "Gemma US$9; Qwen geracao US$18; preparacao local US$0"
+        )
         if args.dry_run:
             log("Validacao encerrada sem API. Nenhuma rodada ativa criada ou avancada")
             return
-        result = execute_round(plan, records, states, accepted, frozen, ROOT)
+        result = execute_round(plan, records, states, accepted, frozen, ROOT, paid_ling=paid_ling)
         log(
             f"Rodada {'concluida' if result['complete'] else 'pendente'}: "
             f"{result['pending_generations']}"

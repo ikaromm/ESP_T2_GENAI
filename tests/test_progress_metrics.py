@@ -138,7 +138,7 @@ def test_cli_failed_round_updates_metrics_and_keeps_failure(metrics, monkeypatch
     monkeypatch.setattr(
         rounds,
         "execute_round",
-        lambda *args: {"complete": False, "pending_generations": {"gemma26": 1}},
+        lambda *args, **kwargs: {"complete": False, "pending_generations": {"gemma26": 1}},
     )
     calls = []
     monkeypatch.setattr(rounds, "update_metrics", lambda *args: calls.append(args))

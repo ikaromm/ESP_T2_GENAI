@@ -163,3 +163,36 @@ def test_only_inflight_402_is_retryable_and_rate_recovers_gradually(core):
     for _ in range(100):
         rate.success(132)
     assert rate.data["rpm"] == 300
+
+
+def test_paid_ling_resumes_audited_free_404_as_new_attempt(core, tmp_path):
+    clock, _good, _args, kwargs = setup(core, tmp_path)
+    target = core.TARGETS["ling-paid-novita"]
+    row = dict(
+        doc_id="d", arm="C1", prompt_tokens=10, max_output_tokens=8192,
+        messages=[{"role": "user", "content": "a"}],
+    )
+    rows = [row] * 961
+    old = dict(
+        case=960, doc_id="d", arm="C1", reserved_usd="0",
+        status="http_retryable", at=clock() - 100,
+        error={"http_status": 404, "message": "This model is unavailable for free."},
+    )
+    (tmp_path / "ledger.json").write_text(json.dumps(dict(identity={"same": True}, attempts=[old])))
+    free_request = core.request_payload(core.TARGETS["ling-free"], row)
+    (tmp_path / "0960-0.request.json").write_text(json.dumps(free_request))
+    response = dict(
+        model=target[0], provider=target[2],
+        usage=dict(cost=0.0001, prompt_tokens=10, completion_tokens=1),
+        choices=[dict(finish_reason="stop", message=dict(content="summary"))],
+    )
+    core.run(
+        rows, target, tmp_path, core.money(1), {"same": True},
+        SimpleNamespace(_request=lambda *unused: response),
+        case_indices={960}, amendment_sha256="a" * 64, **kwargs,
+    )
+    attempts = json.loads((tmp_path / "ledger.json").read_text())["attempts"]
+    assert [a["status"] for a in attempts] == ["http_retryable", "accepted"]
+    assert attempts[-1]["retry_cycle_end"] == 7
+    assert attempts[-1]["amendment_sha256"] == "a" * 64
+    assert json.loads((tmp_path / "0960-1.request.json").read_text())["model"] == target[0]

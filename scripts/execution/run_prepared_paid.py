@@ -22,6 +22,13 @@ from scripts.experiments.screen_openrouter import RequestWindow, save
 
 TARGETS = {
     "ling-free": ("inclusionai/ling-3.0-flash-fin:free", "novita", "Novita", "0", "0"),
+    "ling-paid-novita": (
+        "inclusionai/ling-3.0-flash-fin",
+        "novita",
+        "Novita",
+        "0.042",
+        "0.1232",
+    ),
     "gemma26": ("google/gemma-4-26b-a4b-it", "darkbloom", "Darkbloom", "0.042", "0.22"),
     "ling-paid": ("inclusionai/ling-3.0-flash-fin", "deepinfra/fp4", "DeepInfra", "0.06", "0.18"),
     "qwen37": ("qwen/qwen3.7-flash", "alibaba", "Alibaba", "0.1", "0.4"),
@@ -69,6 +76,51 @@ def request_payload(target, row):
             "max_price": {"prompt": float(target[3]), "completion": float(target[4])},
         },
     }
+
+
+PAID_LING_AMENDMENT = Path("configs/ling-paid-round-161-320.json")
+
+
+def paid_ling_amendment():
+    raw = PAID_LING_AMENDMENT.read_bytes()
+    data = json.loads(raw)
+    target = TARGETS["ling-paid-novita"]
+    if (
+        data.get("version") != 1
+        or data.get("scope") != "explicit_paid_ling_for_active_round_only"
+        or (data.get("paid_model"), data.get("provider")) != target[:2]
+        or data.get("free_model") != TARGETS["ling-free"][0]
+        or (data.get("max_input_usd_per_million"), data.get("max_output_usd_per_million"))
+        != target[3:5]
+        or (data.get("first_case"), data.get("last_case_exclusive")) != (960, 1920)
+        or money(data.get("budget_usd", -1)) != money("2.00")
+    ):
+        raise ValueError("adendo do Ling pago difere do contrato autorizado")
+    return data, hashlib.sha256(raw).hexdigest()
+
+
+def target_for_saved_attempt(default_target, folder, entry, row):
+    if "response_file" in entry:
+        request_path = folder / entry["response_file"].replace(".response.", ".request.")
+    elif entry["case"] == 960 and entry.get("error", {}).get("http_status") == 404:
+        request_path = folder / "0960-0.request.json"
+    else:
+        raise ValueError("tentativa sem caminho de request auditavel")
+    request = json.loads(request_path.read_text())
+    if request == request_payload(default_target, row):
+        return default_target
+    if default_target != TARGETS["ling-free"]:
+        raise ValueError("request aceita difere do prompt congelado")
+    if request.get("model") != TARGETS["ling-paid-novita"][0]:
+        raise ValueError("request aceita difere do prompt congelado")
+    amendment, amendment_sha = paid_ling_amendment()
+    if (
+        not amendment["first_case"] <= entry["case"] < amendment["last_case_exclusive"]
+        or entry.get("amendment_sha256") != amendment_sha
+        or request != request_payload(TARGETS["ling-paid-novita"], row)
+    ):
+        raise ValueError("request paga fora do adendo autorizado")
+    return TARGETS["ling-paid-novita"]
 
 
 def validate_response(response, target, row):
@@ -310,7 +362,8 @@ def _run_locked(
         previous = [a for a in ledger["attempts"] if a["case"] == index]
         if previous and previous[-1]["status"] == "accepted":
             response = json.loads((output / previous[-1]["response_file"]).read_text())
-            validate_response(response, target, row)
+            saved_target = target_for_saved_attempt(target, output, previous[-1], row)
+            validate_response(response, saved_target, row)
             continue
         if max_new_calls is not None and current_document != row["doc_id"]:
             accepted_cases = {a["case"] for a in ledger["attempts"] if a["status"] == "accepted"}

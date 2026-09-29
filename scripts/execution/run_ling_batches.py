@@ -23,8 +23,9 @@ from scripts.execution.run_prepared_paid import (
     TARGETS,
     load_prepared,
     money,
-    request_payload,
+    paid_ling_amendment,
     run,
+    target_for_saved_attempt,
     validate_response,
 )
 from scripts.experiments.screen_openrouter import save
@@ -62,12 +63,8 @@ def accepted_cases(folder, rows, identity, model="ling-free"):
         if entry["status"] != "accepted":
             continue
         response_path = folder / entry["response_file"]
-        request_path = response_path.with_name(
-            response_path.name.replace(".response.", ".request.")
-        )
-        if json.loads(request_path.read_text()) != request_payload(TARGETS[model], rows[index]):
-            raise ValueError("request aceita difere do prompt congelado")
-        validate_response(json.loads(response_path.read_text()), TARGETS[model], rows[index])
+        target = target_for_saved_attempt(TARGETS[model], folder, entry, rows[index])
+        validate_response(json.loads(response_path.read_text()), target, rows[index])
         accepted.add(index)
     return accepted
 
@@ -182,7 +179,9 @@ def document_indices(records, documents):
     }
 
 
-def run_selection(state, *, documents=None, batch=None, execute=False, stop_event=None):
+def run_selection(
+    state, *, documents=None, batch=None, execute=False, stop_event=None, paid_ling=None
+):
     """Executor comum aos lotes fixos e ao Bash; um unico ledger/orcamento por modelo."""
     with output_lock(state.output):
         accepted = state.accepted()
@@ -199,6 +198,14 @@ def run_selection(state, *, documents=None, batch=None, execute=False, stop_even
             )
             label = f"Lote {selected}/10" if selected else "Todos os lotes completos"
         pending = indices - accepted
+        if paid_ling is not None:
+            if state.model != "ling-free":
+                raise ValueError("adendo pago exclusivo do Ling")
+            amendment, amendment_sha = paid_ling_amendment()
+            if paid_ling != amendment_sha or not indices <= set(
+                range(amendment["first_case"], amendment["last_case_exclusive"])
+            ):
+                raise ValueError("selecao fora do adendo pago autorizado")
         log(f"{state.model}: {label}; {len(pending)} geracoes pendentes (sem retries)")
         if not execute:
             log(f"Validado sem API; teto cumulativo: US$ {state.budget}")
@@ -208,7 +215,7 @@ def run_selection(state, *, documents=None, batch=None, execute=False, stop_even
                 ensure_meteor_resources()
             transport = OpenRouterFreeClient(load_key(), timeout=240)
             remaining = None
-            if state.model == "ling-free":
+            if state.model == "ling-free" and paid_ling is None:
                 with activity("Consultando cota gratuita"):
                     quota = transport.quota()
                 save(state.output / "quota-before.json", quota)
@@ -216,9 +223,10 @@ def run_selection(state, *, documents=None, batch=None, execute=False, stop_even
                 if type(remaining) is not int or remaining < 0:
                     raise ValueError("cota gratuita indisponivel; nao iniciar chamadas")
                 log(f"Cota restante: {remaining}")
-            log(f"Teto cumulativo: US$ {state.budget}; modelo {state.model}")
+            budget = money(amendment["budget_usd"]) if paid_ling is not None else state.budget
+            log(f"Teto cumulativo: US$ {budget}; modelo {state.model}")
             try:
-                if state.model == "ling-free":
+                if state.model == "ling-free" and paid_ling is None:
                     run(
                         state.rows,
                         TARGETS[state.model],
@@ -234,15 +242,21 @@ def run_selection(state, *, documents=None, batch=None, execute=False, stop_even
                 else:
                     from scripts.execution.run_paid_concurrent import run as run_concurrent
 
+                    target = (
+                        TARGETS["ling-paid-novita"]
+                        if paid_ling is not None
+                        else TARGETS[state.model]
+                    )
                     run_concurrent(
                         state.rows,
-                        TARGETS[state.model],
+                        target,
                         state.folder,
-                        state.budget,
+                        budget,
                         state.identity,
                         transport,
                         case_indices=indices,
                         stop_event=stop_event,
+                        **({"amendment_sha256": paid_ling} if paid_ling is not None else {}),
                     )
             finally:
                 report = export_progress(state.output, state.rows, state.records, state.accepted())

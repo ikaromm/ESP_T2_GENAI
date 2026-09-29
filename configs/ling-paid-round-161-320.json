@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "scope": "explicit_paid_ling_for_active_round_only",
+  "authorized_on": "2026-09-28",
+  "plan_id": "1b49580df658615068d66adab2082c7b5265fcb0daa257336b11d4e6b17b61b8",
+  "cohort_sha256": "723c0adc9dae5f0496c3bf1b9cd442c8d5d39aefb4f26dd5d38e8736351fe354",
+  "first_case": 960,
+  "last_case_exclusive": 1920,
+  "free_model": "inclusionai/ling-3.0-flash-fin:free",
+  "paid_model": "inclusionai/ling-3.0-flash-fin",
+  "provider": "novita",
+  "max_input_usd_per_million": "0.042",
+  "max_output_usd_per_million": "0.1232",
+  "budget_usd": "2.00",
+  "reason": "Free Ling returned HTTP 404; user authorized paid Ling for these 160 documents. Earlier free responses remain unchanged."
+}

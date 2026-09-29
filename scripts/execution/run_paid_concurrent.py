@@ -12,6 +12,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from findsum_rag.openrouter import OpenRouterHTTPError
 from findsum_rag.progress import log
 from scripts.execution.run_prepared_paid import (
+    TARGETS,
     money,
     request_payload,
     reservation,
@@ -102,9 +103,12 @@ def run(
     clock=time.time,
     sleep=time.sleep,
     jitter=None,
+    amendment_sha256=None,
 ):
     if target[0].endswith(":free"):
         raise ValueError("executor concorrente exclusivo dos modelos pagos")
+    if amendment_sha256 is not None and target != TARGETS["ling-paid-novita"]:
+        raise ValueError("adendo pago exclusivo do Ling via Novita")
     jitter = jitter or (lambda: random.uniform(0, 0.5))
     output.mkdir(parents=True, exist_ok=True)
     with (output / ".run.lock").open("a") as lock:
@@ -138,6 +142,25 @@ def run(
             if old and old[-1]["status"] not in {"http429", "http_retryable"}:
                 raise ValueError("tentativa incerta/rejeitada exige auditoria antes de retomar")
             end = old[-1].get("retry_cycle_end", 6) if old else 6
+            if old and amendment_sha256 is not None:
+                if "response_file" in old[-1]:
+                    last_request = output / old[-1]["response_file"].replace(
+                        ".response.", ".request."
+                    )
+                elif index == 960 and len(old) == 1:
+                    last_request = output / "0960-0.request.json"
+                else:
+                    raise ValueError("tentativa anterior sem request auditavel")
+                previous_model = json.loads(last_request.read_text())["model"]
+                if previous_model != target[0]:
+                    if (
+                        previous_model != "inclusionai/ling-3.0-flash-fin:free"
+                        or old[-1].get("error", {}).get("http_status") != 404
+                        or "unavailable for free"
+                        not in str(old[-1]["error"].get("message", "")).lower()
+                    ):
+                        raise ValueError("troca de endpoint sem auditoria do erro anterior")
+                    end = len(old) + 6
             if len(old) >= end:
                 if clock() - old[-1]["at"] < 3600:
                     raise ValueError("seis tentativas; circuito aberto por uma hora")
@@ -255,6 +278,8 @@ def run(
                                 retry_cycle_end=cycles[index],
                                 dispatch_rpm=rate.data["rpm"],
                             )
+                            if amendment_sha256 is not None:
+                                entry["amendment_sha256"] = amendment_sha256
                             save(output / (stem + ".request.json"), payload)
                             ledger["attempts"].append(entry)
                             old.append(entry)

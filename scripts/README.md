@@ -29,6 +29,10 @@ uv run --locked python -m scripts.preparation.prepare_gemma_from_common \
 
 # Atualiza as métricas pela entrada que valida os artefatos:
 bash rodar_rodada.sh --metrics-only
+
+# Retoma somente a rodada histórica 161–320 com Ling pago no Novita,
+# conforme configs/ling-paid-round-161-320.json:
+bash rodar_rodada.sh 160 --ling-paid-this-round
 ```
 
 Preparações prontas não devem ser sobrescritas. Não execute `freeze_full_openrouter` sem `--verify` para contornar uma divergência: o congelamento novo exige revisão e preservação do lock anterior.
