@@ -15,6 +15,7 @@ from threading import Event
 
 from findsum_rag.full_lock import DEFAULT_LOCK, verify_full_lock
 from findsum_rag.progress import log
+from scripts.evaluation.render_readable_progress import render_readable_progress
 from scripts.evaluation.update_progress_metrics import update_metrics
 from scripts.execution.run_ling_batches import (
     ARMS,
@@ -35,6 +36,12 @@ from scripts.experiments.screen_openrouter import save
 MODELS = ("ling-free", "gemma26", "qwen37")
 SLUGS = {"ling-free": "ling", "gemma26": "gemma", "qwen37": "qwen"}
 ROOT = Path("outputs/full-rounds")
+
+
+def refresh_progress(records, states):
+    """Calcula somente pares pendentes e atualiza as figuras legiveis a partir do resumo."""
+    update_metrics(records, states)
+    render_readable_progress()
 
 
 def checksum(data):
@@ -348,7 +355,7 @@ def main():
         records = frozen["cohort"]
         states, accepted = inspect_models(records)
         if args.metrics_only:
-            update_metrics(records, states)
+            refresh_progress(records, states)
             return
         audit_batch(states["ling-free"], 1)
         # O plano so e salvo depois de casar com o adendo, se o Ling pago foi pedido.
@@ -356,7 +363,7 @@ def main():
         if plan is None:
             log("Os tres modelos ja concluiram todos os documentos; nenhuma geracao pendente")
             if not args.dry_run:
-                update_metrics(records, states)
+                refresh_progress(records, states)
             return
         found = round_amendment(plan, records)
         if args.ling_paid_this_round and found is None:
@@ -407,7 +414,7 @@ def main():
             f"Rodada {'concluida' if result['complete'] else 'pendente'}: "
             f"{result['pending_generations']}"
         )
-        update_metrics(records, states)
+        refresh_progress(records, states)
         if not result["complete"]:
             raise SystemExit(1)
 

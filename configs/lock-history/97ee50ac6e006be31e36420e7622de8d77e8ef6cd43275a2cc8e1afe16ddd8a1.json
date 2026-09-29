@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-29T13:44:00.632978+00:00",
+  "created_at": "2026-09-29T11:48:59.529623+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -20,11 +20,10 @@
     "scripts/evaluation/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/evaluation/audit_example_metrics.py": "96db9fb3df949ec9aae14c3f0d1c924c9b5ea0e4121037f73068a3538544895e",
     "scripts/evaluation/extend_reference_metrics.py": "b6c597b6ca3b7d1060c75d41d8d4c0654a484074ade0c6dbf789f9ae1271c029",
-    "scripts/evaluation/render_readable_progress.py": "47c7d87d0ef8d3aaae2fde9d4074c70117fa1798067b1a75bb7ac8d33bb90032",
     "scripts/evaluation/update_progress_metrics.py": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93",
     "scripts/execution/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/execution/run_experiment_openrouter.py": "15bf000b9ba5b6a8f4ada8aa0ba6398bc119b9c8cf74e993976f843bfffb61c2",
-    "scripts/execution/run_full_round.py": "5e136737803eed5d6cf9279c20b0d80b2488211363129a009d1b87a7ccb8c19f",
+    "scripts/execution/run_full_round.py": "8a0524236cee4496a7e66df849104a02e6d39ebecc994375e151581efacbc9a5",
     "scripts/execution/run_ling_batches.py": "79d6d6e2835f5eb33925828deffc1d034424ae50fa100c462f48b47c3cf4693c",
     "scripts/execution/run_paid_concurrent.py": "75ef8bafbacda16a37ef74f7284f184b38d656c93fa9983ffadd5c7cef94d5d7",
     "scripts/execution/run_prepared_paid.py": "d68b482ff6a50de3b5ddf0acafc2fbc749340d670848cf6270a0b680b8ae5b84",
@@ -57,7 +56,7 @@
     "src/findsum_rag/data.py": "b35324f0265ef9f71ed15aecc37865ef210744b76d7b831e8f6bc879293c8a04",
     "src/findsum_rag/examples.py": "b11cda5455e3779582936b6effaf1d19b8979e03fb92b49e87a96378bde0ee0a",
     "src/findsum_rag/factual.py": "5c52c80aa5efd4984ea32c1dcccfb191f118a0be01933b3d529de63cef80fec5",
-    "src/findsum_rag/full_lock.py": "426ce88c960b22f27f1c91d3ea86eda0e61a0670f32467d957eb47cd3b6444ef",
+    "src/findsum_rag/full_lock.py": "9def7d3331511eb39c054b6c587c0375863221b676c2f3718d6467cec732c1f0",
     "src/findsum_rag/generate.py": "7cf0533e6036ec7d8dbeba68103ee8862272dd85d11028170d62ac7edff9bc4e",
     "src/findsum_rag/grounding_audit.py": "7a8e329fc12c77306dfeaaea724aad531a9d02cb5e9ce260ad66355709418de2",
     "src/findsum_rag/metrics.py": "a5d1901126a24111dae78826df63be2861c3eb9a065babf35b965d6bb2fb01c9",
@@ -7224,19 +7223,19 @@
   },
   "compatible_prepared_locks": [
     "c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1",
-    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41",
-    "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0"
+    "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0",
+    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41"
   ],
   "compatible_prepared_models": {
     "c0d3eb15c1eb74f516b4d63e22e82eeac614a53d6d63789f61db970c44ce88f1": [
       "ling-free"
     ],
-    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41": [
-      "qwen37"
-    ],
     "e40bea867c4ca0ff17ed006c198c1710400f1a7761d3ff09f3bc6195bba096c0": [
       "gemma26"
+    ],
+    "ba25b3674eccd5f9dad039cd1517e58c5a078119ad2972df1de7e14003dfce41": [
+      "qwen37"
     ]
   },
-  "lock_id": "b1fc97a1e599a63df80c7c85129363be6017eb663aeaefae09e11f717b685f8a"
+  "lock_id": "97ee50ac6e006be31e36420e7622de8d77e8ef6cd43275a2cc8e1afe16ddd8a1"
 }

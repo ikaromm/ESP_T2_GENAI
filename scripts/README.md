@@ -7,7 +7,7 @@ Execute os módulos a partir da raiz do repositório. As entradas do dia a dia c
 | `data/` | Obter dados e separar conjuntos | `fetch_findsum`, `build_splits` |
 | `preparation/` | Preparar fonte/RAG/exemplos, validar tokens e congelar | `prepare_full_openrouter`, `prepare_gemma_from_common`, `freeze_full_openrouter` |
 | `execution/` | Executar e retomar chamadas | `run_full_round`, `run_ling_batches`, `run_paid_concurrent` |
-| `evaluation/` | Métricas e auditoria | `update_progress_metrics`, `extend_reference_metrics`, `audit_example_metrics` |
+| `evaluation/` | Métricas, auditoria e figuras legíveis | `update_progress_metrics`, `render_readable_progress`, `extend_reference_metrics`, `audit_example_metrics` |
 | `reports/` | Exportar relatórios locais | `build_dev_review`, `build_example_guide`, `build_pipeline_guide` |
 | `experiments/` | PoCs e testes auxiliares, fora do Bash normal | `poc_openrouter`, `benchmark_paid_rates`, `run_example_trace` |
 | `common/` | Contratos compartilhados | `full_common` |
@@ -29,6 +29,9 @@ uv run --locked python -m scripts.preparation.prepare_gemma_from_common \
 
 # Atualiza as métricas pela entrada que valida os artefatos:
 bash rodar_rodada.sh --metrics-only
+
+# Atualiza somente as figuras e as tabelas descritivas dos READMEs:
+uv run --locked python -m scripts.evaluation.render_readable_progress
 
 # Ling pago no Novita somente quando a rodada selecionada coincide com um adendo
 # registrado; 161–320 e 321–520 já estão concluídas e servem apenas para retomada:

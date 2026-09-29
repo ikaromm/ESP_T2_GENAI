@@ -2,11 +2,70 @@
 
 ![Painel das métricas](dashboard.png)
 
+<!-- readable-progress:start -->
+
+**Gráficos ampliados:** os quatro painéis têm eixos verticais focados na faixa observada e limites visíveis. Abra os SVGs para ampliar sem perda de nitidez.
+
+| Métrica | Figura detalhada | Versão vetorial |
+|---|---|---|
+| BERTScore F1 | [PNG](bertscore-f1.png) | [SVG](bertscore-f1.svg) |
+| ROUGE-L F1 | [PNG](rouge-l-f1.png) | [SVG](rouge-l-f1.svg) |
+| METEOR | [PNG](meteor.png) | [SVG](meteor.svg) |
+| Evolução cumulativa | [PNG](evolucao.png) | [SVG](evolucao.svg) |
+
+![BERTScore F1 ampliado](bertscore-f1.png)
+
+![ROUGE-L F1 ampliado](rouge-l-f1.png)
+
+![METEOR ampliado](meteor.png)
+
+![Evolução cumulativa ampliada](evolucao.png)
+
+## Hipóteses e observações parciais
+
+Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo significa maior similaridade média com a referência no primeiro braço; Δ negativo, menor. As diferenças abaixo são pontos da escala 0 a 1, não percentuais de acerto.
+
+| Hipótese | Comparação | Pergunta |
+|---|---|---|
+| H1 | C2 - C1 | RAG versus fonte inteira |
+| H1b | C2 - C1t | RAG versus prefixo de igual orçamento |
+| H2 | C3 - C2 | Quatro exemplos fixos versus zero-shot RAG |
+| H3 | C4 - C3 | Aleatórios versus fixos: controle de sensibilidade |
+| H4 | C5 - C4 | Similares versus aleatórios |
+
+H3 é um **controle de sensibilidade** à escolha dos exemplos: uma diferença não significativa ao final não provaria equivalência. As métricas primárias são BERTScore F1 e ROUGE-L F1; METEOR e BERTScore precisão/recall são descritivos.
+
+**Recorte atual: 520 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
+
+| Modelo | Hipótese | Δ BERTScore F1 | Δ ROUGE-L F1 |
+|---|---|---:|---:|
+| Ling Flash Fin | H1 | -0,0366 | -0,0214 |
+| Ling Flash Fin | H1b | +0,0322 | +0,0275 |
+| Ling Flash Fin | H2 | -0,0182 | -0,0090 |
+| Ling Flash Fin | H3 | +0,0119 | +0,0081 |
+| Ling Flash Fin | H4 | +0,0040 | +0,0017 |
+| Qwen3.7 Flash | H1 | -0,0388 | -0,0229 |
+| Qwen3.7 Flash | H1b | +0,0060 | +0,0124 |
+| Qwen3.7 Flash | H2 | -0,0043 | -0,0116 |
+| Qwen3.7 Flash | H3 | +0,0137 | +0,0112 |
+| Qwen3.7 Flash | H4 | +0,0077 | +0,0033 |
+| Gemma 4 26B A4B | H1 | -0,0365 | -0,0243 |
+| Gemma 4 26B A4B | H1b | +0,0302 | +0,0167 |
+| Gemma 4 26B A4B | H2 | -0,0101 | -0,0072 |
+| Gemma 4 26B A4B | H3 | +0,0094 | +0,0069 |
+| Gemma 4 26B A4B | H4 | +0,0067 | +0,0061 |
+
+Nos três modelos, **H1 é negativa** e **H1b é positiva**: o RAG ficou abaixo da fonte inteira, mas acima do prefixo com o mesmo orçamento de contexto. **H2 é negativa**: quatro exemplos fixos reduziram as duas métricas primárias frente ao RAG sem exemplos. **H3 e H4 são positivas**, com ganho menor em H4. Isso descreve este recorte e não estabelece eficácia causal ou qualidade factual.
+
+**Nenhuma hipótese foi confirmada ou refutada aqui.** O teste predefinido usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo, somente depois dos 1.000 documentos. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
+
+<!-- readable-progress:end -->
+
 **520/1000 documentos no prefixo comum completo.** Atualização local automática pelo Bash, sem chamadas de geração adicionais para as métricas.
 
 Somente os documentos consecutivos da ordem congelada com seis respostas aceitas em todos os modelos entram na matriz. Pendências de um modelo não alteram a base de comparação. Progresso individual aparece nos cartões.
 
-Resultados descritivos: sem p-valores ou confirmação de hipóteses. A rotina confirmatória final permanece separada. BERTScore XLNet-base-cased, camada 5, sem IDF/rescale, textos integrais; ROUGE-L F1; METEOR. Todos os eixos partem de zero; seus limites estão explícitos no painel.
+Resultados descritivos: sem p-valores ou confirmação de hipóteses. A rotina confirmatória final permanece separada. BERTScore XLNet-base-cased, camada 5, sem IDF/rescale, textos integrais; ROUGE-L F1; METEOR. Os eixos ampliados e seus limites estão explícitos em cada figura.
 
 | Modelo | Braço | BERT P | BERT R | BERT F1 | ROUGE-L | METEOR |
 |---|---|---:|---:|---:|---:|---:|

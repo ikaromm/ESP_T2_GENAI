@@ -26,14 +26,17 @@ A evolução é cumulativa, com pontos a cada 100 documentos e no prefixo atual,
 
 - `results/progress/README.md`: painel e matriz por braço/modelo.
 - `dashboard.png` e `dashboard.svg`: gráficos estáticos renderizados pelo GitHub, sem serviço externo.
+- `bertscore-f1`, `rouge-l-f1`, `meteor` e `evolucao` em PNG/SVG: figuras individuais em escala ampliada.
 - `scores.csv`: valores individuais sem textos de entrada ou saída.
 - `summary.json`: médias, cobertura, IDs, método, hashes dos ledgers e auditoria de tokens.
 - `history.json`: pontos cumulativos usados no gráfico.
 
+O Bash chama `scripts.evaluation.render_readable_progress` depois de calcular as métricas. Esse passo usa apenas `summary.json` e `history.json`: cria o painel 2×2, figuras PNG/SVG individuais com eixos ampliados e atualiza as tabelas de hipóteses nos dois READMEs. O código científico de pontuação e o identificador do cache não mudam. Os eixos ampliados são identificados em cada figura e permitem ler diferenças pequenas; a tabela preserva os valores exatos. Para refazer somente a apresentação, sem validar os 6.000 prompts de cada modelo: `uv run --locked python -m scripts.evaluation.render_readable_progress`.
+
 O README principal referencia a imagem atualizada. O Bash prepara os arquivos; **não executa commit/push automaticamente**. Para publicar apenas a nova medição:
 
 ```bash
-git add results/progress
+git add results/progress README.md
 git commit -m "results: atualiza acompanhamento do experimento"
 git push origin main
 ```

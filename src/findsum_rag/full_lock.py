@@ -48,6 +48,7 @@ OPERATIONAL_COMPATIBILITY = {
     "scripts/benchmark_paid_rates.py",
     "scripts/run_paid_concurrent.py",
     "scripts/update_progress_metrics.py",
+    "scripts/evaluation/render_readable_progress.py",
     "configs/repository-layout.json",
 }
 

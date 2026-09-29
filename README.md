@@ -6,7 +6,11 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 
 ![Acompanhamento FINDSum](results/progress/dashboard.png)
 
+[BERTScore ampliado](results/progress/bertscore-f1.svg) · [ROUGE-L ampliado](results/progress/rouge-l-f1.svg) · [METEOR ampliado](results/progress/meteor.svg) · [Evolução ampliada](results/progress/evolucao.svg)
+
+<!-- progress-summary:start -->
 **520 documentos concluídos nos três modelos: 9.360 respostas e scores.** O painel apresenta as médias descritivas por braço e modelo. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
+<!-- progress-summary:end -->
 
 - [Painel atual, tabela e evolução cumulativa](results/progress/README.md)
 - [Auditoria congelada dos 520 documentos e custo da rodada 321–520](results/audit520/README.md)
@@ -15,6 +19,48 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 - [Snapshot dos scores e IDs dos primeiros 100](results/first100-20260927/)
 - [Como as métricas são atualizadas](docs/metricas-automaticas.md)
 - [Rodada 161–320 de 28/09: execução, custos e adendo do Ling pago](results/progress/rodada-161-320-20260928.md)
+
+<!-- hypotheses-progress:start -->
+
+## Hipóteses e observações parciais
+
+Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo significa maior similaridade média com a referência no primeiro braço; Δ negativo, menor. As diferenças abaixo são pontos da escala 0 a 1, não percentuais de acerto.
+
+| Hipótese | Comparação | Pergunta |
+|---|---|---|
+| H1 | C2 - C1 | RAG versus fonte inteira |
+| H1b | C2 - C1t | RAG versus prefixo de igual orçamento |
+| H2 | C3 - C2 | Quatro exemplos fixos versus zero-shot RAG |
+| H3 | C4 - C3 | Aleatórios versus fixos: controle de sensibilidade |
+| H4 | C5 - C4 | Similares versus aleatórios |
+
+H3 é um **controle de sensibilidade** à escolha dos exemplos: uma diferença não significativa ao final não provaria equivalência. As métricas primárias são BERTScore F1 e ROUGE-L F1; METEOR e BERTScore precisão/recall são descritivos.
+
+**Recorte atual: 520 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
+
+| Modelo | Hipótese | Δ BERTScore F1 | Δ ROUGE-L F1 |
+|---|---|---:|---:|
+| Ling Flash Fin | H1 | -0,0366 | -0,0214 |
+| Ling Flash Fin | H1b | +0,0322 | +0,0275 |
+| Ling Flash Fin | H2 | -0,0182 | -0,0090 |
+| Ling Flash Fin | H3 | +0,0119 | +0,0081 |
+| Ling Flash Fin | H4 | +0,0040 | +0,0017 |
+| Qwen3.7 Flash | H1 | -0,0388 | -0,0229 |
+| Qwen3.7 Flash | H1b | +0,0060 | +0,0124 |
+| Qwen3.7 Flash | H2 | -0,0043 | -0,0116 |
+| Qwen3.7 Flash | H3 | +0,0137 | +0,0112 |
+| Qwen3.7 Flash | H4 | +0,0077 | +0,0033 |
+| Gemma 4 26B A4B | H1 | -0,0365 | -0,0243 |
+| Gemma 4 26B A4B | H1b | +0,0302 | +0,0167 |
+| Gemma 4 26B A4B | H2 | -0,0101 | -0,0072 |
+| Gemma 4 26B A4B | H3 | +0,0094 | +0,0069 |
+| Gemma 4 26B A4B | H4 | +0,0067 | +0,0061 |
+
+Nos três modelos, **H1 é negativa** e **H1b é positiva**: o RAG ficou abaixo da fonte inteira, mas acima do prefixo com o mesmo orçamento de contexto. **H2 é negativa**: quatro exemplos fixos reduziram as duas métricas primárias frente ao RAG sem exemplos. **H3 e H4 são positivas**, com ganho menor em H4. Isso descreve este recorte e não estabelece eficácia causal ou qualidade factual.
+
+**Nenhuma hipótese foi confirmada ou refutada aqui.** O teste predefinido usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo, somente depois dos 1.000 documentos. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
+
+<!-- hypotheses-progress:end -->
 
 ## Executar uma rodada
 
@@ -29,7 +75,7 @@ bash rodar_rodada.sh --metrics-only # atualiza apenas métricas e painel, sem AP
 
 A preparação integral já existe neste workspace em `outputs/full-{ling,qwen,gemma}-prepared`. Uma nova instalação precisa do dataset, dos modelos locais e desses artefatos preparados; eles não estão no Git. O caminho da credencial é `../.env`, variável `OPEN_ROUTER_KEY`. Nunca adicione esse arquivo ao repositório.
 
-Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 520 estão gerados e pontuados; a próxima execução normal seleciona os documentos ainda não processados.
+Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. O prefixo gerado e pontuado está no painel acima; a próxima execução normal seleciona os documentos ainda não processados.
 
 A execução normal envia chamadas pagas de Qwen/Gemma. `--dry-run`, `--metrics-only` e `--audit-ling-batch 1` são modos locais. Não apague `outputs/full-rounds/active-round.json`, os ledgers ou as pastas de respostas para tentar avançar.
 
@@ -45,7 +91,7 @@ Os tetos não garantem vazão sustentada ou conclusão com esse saldo. Nos pagos
 Ao encerrar, o Bash atualiza `results/progress/` usando somente o prefixo completo comum aos três modelos. Usa cache para evitar recálculo. Não faz commit ou push automaticamente:
 
 ```bash
-git add results/progress
+git add results/progress README.md
 git commit -m "results: atualiza acompanhamento do experimento"
 git push origin main
 ```
@@ -106,4 +152,4 @@ uv run --locked ruff check src scripts tests
 
 O lock verifica código, dados, modelos locais, versões e compatibilidade dos artefatos preparados antes da geração. A migração de caminhos está documentada por hashes em `configs/repository-layout.json`; ela não autoriza alterações nos insumos científicos.
 
-Esta revisão passou na suíte automatizada sem `slow` e `test_real_data.py`, no Ruff e na verificação do lock. Os 9.360 scores têm IDs únicos e auditoria sem truncamento; os 5.760 scores anteriores permaneceram idênticos.
+Esta revisão passou na suíte automatizada sem `slow` e `test_real_data.py`, no Ruff e na verificação do lock. Os scores auditados têm IDs únicos e cobertura integral do texto; o [snapshot dos primeiros 520 documentos](results/audit520/README.md) permanece congelado.

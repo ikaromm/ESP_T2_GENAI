@@ -88,7 +88,14 @@ def main() -> None:
     require(len(ids) == len(set(ids)) == 1000, "coorte invalida")
     require(len({r["stock_name"] for r in cohort}) == 1000, "empresa repetida na coorte")
     lock = json.loads((ROOT / "configs/full_openrouter.lock.json").read_text())
+    snapshot_lock = json.loads((ROOT / "configs/lock-history" /
+                                "97ee50ac6e006be31e36420e7622de8d77e8ef6cd43275a2cc8e1afe16ddd8a1.json"
+                                ).read_text())
     require([r["doc_id"] for r in lock["cohort"]] == ids, "coorte do lock difere do CSV")
+    require(lock["cohort"] == snapshot_lock["cohort"]
+            and lock["analysis_plan"] == snapshot_lock["analysis_plan"]
+            and lock["dataset_files"] == snapshot_lock["dataset_files"],
+            "lock atual alterou a coorte, o plano ou os dados do snapshot")
     manifest = json.loads((ROOT / "data/interim/splits-liquidity.json").read_text())
     sets = manifest["sets"]
     companies = [{r["stock_name"] for r in sets[s]} for s in ("examples", "dev", "eval")]
@@ -353,7 +360,7 @@ def main() -> None:
         "first_320_scores_unchanged": True,
         "first_320_raw_artifacts_unchanged": True,
         "hypotheses_tested": False,
-        "lock_id": lock["lock_id"],
+        "lock_id": snapshot_lock["lock_id"],
         "metrics_method_id": summary["method_id"],
         "scores_csv_sha256": digest(OUT / "scores-520.csv"),
         "summary_snapshot_sha256": digest(OUT / "summary-520.json"),
