@@ -22,6 +22,40 @@ from scripts.experiments.screen_openrouter import save
 
 MAX_RPM = 500
 MAX_CONCURRENT = 100
+TRANSIENT_STATUSES = {408, 429, 500, 502, 503, 504}
+
+
+class EmbeddedProviderError(RuntimeError):
+    """Erro explicito do provedor dentro de HTTP 200; nao inventa status HTTP."""
+
+    def __init__(self, details):
+        self.details = details
+        self.status = details["code"]
+        super().__init__(f"erro embutido do provedor: {details['code']}")
+
+    def retry_delay(self, default):
+        return default
+
+
+def embedded_error(response):
+    """Somente choices[0] com finish_reason=error e codigo transitorio explicito."""
+    choices = response.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return None
+    error = choices[0].get("error")
+    if choices[0].get("finish_reason") != "error" or not isinstance(error, dict):
+        return None
+    code = error.get("code")
+    if type(code) is not int or code not in TRANSIENT_STATUSES:
+        return None
+    metadata = error.get("metadata") if isinstance(error.get("metadata"), dict) else {}
+    return EmbeddedProviderError(
+        {
+            "code": code,
+            "message": error.get("message"),
+            "metadata": {k: metadata[k] for k in ("error_type", "provider_name") if k in metadata},
+        }
+    )
 
 
 def dispatch_delay(sent, rpm, now):
@@ -31,10 +65,15 @@ def dispatch_delay(sent, rpm, now):
     return max(spacing, rolling)
 
 
-def held_cost(ledger):
+def held_cost(ledger, cases=None):
+    """Custo retido: aceito pelo custo reportado; demais pela reserva maxima."""
     return sum(
-        money(a["reported_cost_usd"] if a["status"] == "accepted" else a["reserved_usd"])
-        for a in ledger["attempts"]
+        (
+            money(a["reported_cost_usd"] if a["status"] == "accepted" else a["reserved_usd"])
+            for a in ledger["attempts"]
+            if cases is None or a["case"] in cases
+        ),
+        money(0),
     )
 
 
@@ -47,10 +86,12 @@ def invoke(transport, payload):
 
 
 def transient(error):
+    if isinstance(error, EmbeddedProviderError):
+        return error.status in TRANSIENT_STATUSES
     if not isinstance(error, OpenRouterHTTPError):
         return False
     meta = error.details.get("metadata", {})
-    return error.status in {408, 429, 500, 502, 503, 504} or (
+    return error.status in TRANSIENT_STATUSES or (
         error.status == 402
         and meta.get("limit_source") == "openrouter_in_flight_budget"
         and meta.get("reason") == "in_flight_budget_exhausted"
@@ -104,11 +145,17 @@ def run(
     sleep=time.sleep,
     jitter=None,
     amendment_sha256=None,
+    round_budget=None,
 ):
+    """`budget` limita o ledger inteiro; `round_budget`, so os casos selecionados."""
     if target[0].endswith(":free"):
         raise ValueError("executor concorrente exclusivo dos modelos pagos")
     if amendment_sha256 is not None and target != TARGETS["ling-paid-novita"]:
         raise ValueError("adendo pago exclusivo do Ling via Novita")
+    if round_budget is not None:
+        round_budget = money(round_budget)
+        if case_indices is None:
+            raise ValueError("teto incremental exige os casos da rodada")
     jitter = jitter or (lambda: random.uniform(0, 0.5))
     output.mkdir(parents=True, exist_ok=True)
     with (output / ".run.lock").open("a") as lock:
@@ -174,6 +221,7 @@ def run(
             queue[index] = ready
         if not queue:
             return ledger
+        round_cases = set(selected)
         window_path, rate_path = output / "request-window.json", output / "adaptive-rate.json"
         sent = json.loads(window_path.read_text()) if window_path.exists() else []
         rate = AdaptiveRate(json.loads(rate_path.read_text()) if rate_path.exists() else None)
@@ -182,7 +230,12 @@ def run(
         last_log = clock()
         log(
             f"{target[0]}: concorrente, teto 500 RPM; ritmo atual {rate.data['rpm']} RPM; "
-            f"{len(queue)} pendencias"
+            f"{len(queue)} pendencias; retido US$ {held_cost(ledger)}/{budget}"
+            + (
+                f"; retido na rodada US$ {held_cost(ledger, round_cases)}/{round_budget}"
+                if round_budget is not None
+                else ""
+            )
         )
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT) as pool:
             while futures or (queue and reason is None):
@@ -204,13 +257,19 @@ def run(
                             save(output / entry["response_file"], response)
                             if "cost" in response.get("usage", {}):
                                 entry["reported_cost_usd"] = response["usage"]["cost"]
-                            try:
-                                validate_response(response, target, rows[entry["case"]])
-                                entry["status"] = "accepted"
-                                completed += 1
-                                rate.success(clock())
-                            except Exception as exc:
-                                error = exc
+                            same_endpoint = (response.get("model"), response.get("provider")) == (
+                                target[0],
+                                target[2],
+                            )
+                            error = embedded_error(response) if same_endpoint else None
+                            if error is None:
+                                try:
+                                    validate_response(response, target, rows[entry["case"]])
+                                    entry["status"] = "accepted"
+                                    completed += 1
+                                    rate.success(clock())
+                                except Exception as exc:
+                                    error = exc
                         if error is not None:
                             if isinstance(error, OpenRouterHTTPError):
                                 entry["error"] = error.details
@@ -220,6 +279,13 @@ def run(
                                     else "http_retryable"
                                     if transient(error)
                                     else "rejected"
+                                )
+                            elif isinstance(error, EmbeddedProviderError):
+                                # Resposta preservada; o custo retido continua sendo a reserva.
+                                entry.update(
+                                    status="http_retryable",
+                                    embedded_error=error.details,
+                                    retry_classification="embedded_provider_error",
                                 )
                             else:
                                 entry.update(
@@ -237,7 +303,13 @@ def run(
                                 else:
                                     queue[index] = ready
                                 log(
-                                    f"{target[0]}: HTTP {error.status}; retry {attempt}/6; "
+                                    f"{target[0]}: "
+                                    + (
+                                        "erro embutido"
+                                        if isinstance(error, EmbeddedProviderError)
+                                        else "HTTP"
+                                    )
+                                    + f" {error.status}; retry {attempt}/6; "
                                     f"ritmo reduzido a {rate.data['rpm']} RPM, "
                                     f"pausa {max(0, rate.data['pause_until'] - clock()):.1f}s"
                                 )
@@ -260,7 +332,10 @@ def run(
                         index = min(ready_cases, key=lambda i: (not bool(history.get(i)), i))
                         row = rows[index]
                         reserve = reservation(target, row)
-                        if held_cost(ledger) + reserve > budget:
+                        if held_cost(ledger) + reserve > budget or (
+                            round_budget is not None
+                            and held_cost(ledger, round_cases) + reserve > round_budget
+                        ):
                             if not futures:
                                 reason = "teto de gasto atingido antes de enviar"
                         else:

@@ -42,6 +42,8 @@ git push origin main
 
 Se uma geração falhar, os outros modelos continuam conforme a política existente; ao encerrar a tentativa, o painel usa o prefixo completo disponível. O código de falha da rodada continua diferente de zero. Falhas no cálculo não apagam as gerações; rode `--metrics-only` após corrigir a causa. O painel anterior deve ser considerado desatualizado até essa atualização concluir.
 
+Textos muito longos podem exceder a memória da GPU no BERTScore (ocorreu com 11,6 GiB nas rodadas 161–320 e 321–520). Os blocos já salvos permanecem no cache; retome em CPU, sem geração: `CUDA_VISIBLE_DEVICES=-1 OMP_NUM_THREADS=4 bash rodar_rodada.sh --metrics-only`. O modelo, a camada e a configuração são os mesmos; muda só o dispositivo, e podem existir diferenças mínimas de ponto flutuante entre CPU e GPU.
+
 Este painel é descritivo. Não calcula p-valores, não confirma hipóteses e não modifica prompts ou RAG a partir dos resultados parciais. A rotina confirmatória da pipeline continua separada e condicionada aos 1.000 documentos por modelo.
 
 ## Validação desta implementação

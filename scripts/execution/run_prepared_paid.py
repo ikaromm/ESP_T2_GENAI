@@ -14,6 +14,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
+from itertools import pairwise
 from pathlib import Path
 
 from findsum_rag.openrouter import OpenRouterFreeClient, OpenRouterHTTPError
@@ -78,25 +79,109 @@ def request_payload(target, row):
     }
 
 
-PAID_LING_AMENDMENT = Path("configs/ling-paid-round-161-320.json")
+# Adendos historicos do Ling pago, fixados pelo SHA-256 do arquivo. Cada um vale
+# somente para o plano e o intervalo de casos da propria rodada. Nunca edite um
+# adendo existente: registre um novo arquivo e seu hash.
+PAID_LING_AMENDMENTS = (
+    (
+        Path("configs/ling-paid-round-161-320.json"),
+        "e7621072479ad9afec4e287e07c05d9d8a00adbb854526f1eba4a921e814d928",
+    ),
+    (
+        Path("configs/ling-paid-round-321-520.json"),
+        "d4471a339f0e9cb89ca5f9626db666a1e09eba90d6d18c7ee1e5869d431cd160",
+    ),
+)
+PAID_LING_AMENDMENT = PAID_LING_AMENDMENTS[0][0]
+ROUND_BUDGET_MODELS = {"ling-free", "qwen37", "gemma26"}
 
 
-def paid_ling_amendment():
-    raw = PAID_LING_AMENDMENT.read_bytes()
-    data = json.loads(raw)
+def _amendment_contract(data):
     target = TARGETS["ling-paid-novita"]
-    if (
-        data.get("version") != 1
-        or data.get("scope") != "explicit_paid_ling_for_active_round_only"
-        or (data.get("paid_model"), data.get("provider")) != target[:2]
-        or data.get("free_model") != TARGETS["ling-free"][0]
-        or (data.get("max_input_usd_per_million"), data.get("max_output_usd_per_million"))
-        != target[3:5]
-        or (data.get("first_case"), data.get("last_case_exclusive")) != (960, 1920)
-        or money(data.get("budget_usd", -1)) != money("2.00")
-    ):
+    first, last = data.get("first_case"), data.get("last_case_exclusive")
+    common = (
+        data.get("scope") == "explicit_paid_ling_for_active_round_only"
+        and (data.get("paid_model"), data.get("provider")) == target[:2]
+        and data.get("free_model") == TARGETS["ling-free"][0]
+        and (data.get("max_input_usd_per_million"), data.get("max_output_usd_per_million"))
+        == target[3:5]
+        and type(first) is int
+        and type(last) is int
+        and 0 <= first < last <= 6000
+        and first % 6 == 0
+        and last % 6 == 0
+        and all(len(str(data.get(k, ""))) == 64 for k in ("plan_id", "cohort_sha256"))
+    )
+    if data.get("version") == 1:
+        # Contrato historico da rodada 161-320: teto cumulativo do ledger Ling.
+        return (
+            common
+            and (first, last) == (960, 1920)
+            and money(data.get("budget_usd", -1)) == money("2.00")
+        )
+    if data.get("version") != 2:
+        return False
+    # Contrato v2: teto incremental medido nas tentativas dos casos do adendo.
+    budgets = data.get("round_budget_usd")
+    return (
+        common
+        and data.get("budget_scope") == "held_cost_of_attempts_in_amendment_cases"
+        and data.get("round_budget_scope") == "held_cost_of_each_model_attempts_in_amendment_cases"
+        and data.get("requested_cases") == (last - first) // 6
+        and isinstance(budgets, dict)
+        and set(budgets) == ROUND_BUDGET_MODELS
+        and money(budgets["ling-free"]) == money(data["budget_usd"])
+        and sum(money(value) for value in budgets.values())
+        == money(data["round_budget_total_usd"])
+        and money(data["budget_usd"]) <= money(data["cumulative_budget_usd"])
+    )
+
+
+def paid_ling_amendment(path=PAID_LING_AMENDMENT):
+    """Le um adendo registrado; rejeita arquivo editado ou fora do contrato."""
+    path = Path(path)
+    raw = path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    pinned = {str(p): sha for p, sha in PAID_LING_AMENDMENTS}
+    try:
+        valid = pinned.get(str(path)) == digest and _amendment_contract(json.loads(raw))
+    except (ArithmeticError, KeyError, TypeError, ValueError):
+        valid = False
+    if not valid:
         raise ValueError("adendo do Ling pago difere do contrato autorizado")
-    return data, hashlib.sha256(raw).hexdigest()
+    return json.loads(raw), digest
+
+
+def paid_ling_amendments():
+    """Todos os adendos registrados, validados e sem casos ou planos em comum."""
+    result = [paid_ling_amendment(path) for path, _ in PAID_LING_AMENDMENTS]
+    spans = sorted((data["first_case"], data["last_case_exclusive"]) for data, _ in result)
+    if any(before[1] > after[0] for before, after in pairwise(spans)):
+        raise ValueError("adendos do Ling pago com casos sobrepostos")
+    if len({data["plan_id"] for data, _ in result}) != len(result):
+        raise ValueError("adendos do Ling pago com o mesmo plano")
+    return result
+
+
+def paid_ling_amendment_for_case(case):
+    for data, digest in paid_ling_amendments():
+        if data["first_case"] <= case < data["last_case_exclusive"]:
+            return data, digest
+    raise ValueError("request paga fora do adendo autorizado")
+
+
+def paid_ling_amendment_by_sha(digest):
+    for data, known in paid_ling_amendments():
+        if known == digest:
+            return data
+    raise ValueError("adendo do Ling pago nao registrado")
+
+
+def paid_ling_budgets(amendment):
+    """(teto cumulativo do ledger Ling, teto incremental da rodada ou None)."""
+    if amendment["version"] == 1:
+        return money(amendment["budget_usd"]), None
+    return money(amendment["cumulative_budget_usd"]), money(amendment["budget_usd"])
 
 
 def target_for_saved_attempt(default_target, folder, entry, row):
@@ -113,11 +198,10 @@ def target_for_saved_attempt(default_target, folder, entry, row):
         raise ValueError("request aceita difere do prompt congelado")
     if request.get("model") != TARGETS["ling-paid-novita"][0]:
         raise ValueError("request aceita difere do prompt congelado")
-    amendment, amendment_sha = paid_ling_amendment()
-    if (
-        not amendment["first_case"] <= entry["case"] < amendment["last_case_exclusive"]
-        or entry.get("amendment_sha256") != amendment_sha
-        or request != request_payload(TARGETS["ling-paid-novita"], row)
+    # Cada tentativa paga precisa do hash do adendo que cobre o proprio caso.
+    _, amendment_sha = paid_ling_amendment_for_case(entry["case"])
+    if entry.get("amendment_sha256") != amendment_sha or request != request_payload(
+        TARGETS["ling-paid-novita"], row
     ):
         raise ValueError("request paga fora do adendo autorizado")
     return TARGETS["ling-paid-novita"]

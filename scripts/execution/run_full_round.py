@@ -26,7 +26,8 @@ from scripts.execution.run_ling_batches import (
 )
 from scripts.execution.run_prepared_paid import (
     TARGETS,
-    paid_ling_amendment,
+    paid_ling_amendments,
+    paid_ling_budgets,
     target_for_saved_attempt,
 )
 from scripts.experiments.screen_openrouter import save
@@ -209,22 +210,42 @@ def inspect_models(records):
     return states, accepted
 
 
+def round_amendment(plan, records):
+    """Adendo registrado para exatamente este plano; None quando nao existe."""
+    for amendment, amendment_sha in paid_ling_amendments():
+        if amendment["plan_id"] != plan.get("plan_id"):
+            continue
+        first, last = amendment["first_case"], amendment["last_case_exclusive"]
+        if (
+            amendment["cohort_sha256"] != plan["cohort_sha256"]
+            or plan["documents"] != [r["doc_id"] for r in records[first // 6 : last // 6]]
+            or document_indices(records, plan["documents"]) != set(range(first, last))
+        ):
+            raise ValueError("rodada ativa difere do adendo pago autorizado")
+        return amendment, amendment_sha
+    return None
+
+
 def paid_ling_for_plan(plan, records):
-    amendment, amendment_sha = paid_ling_amendment()
-    indices = document_indices(records, plan["documents"])
-    if (
-        amendment["plan_id"] != plan["plan_id"]
-        or amendment["cohort_sha256"] != plan["cohort_sha256"]
-        or plan["documents"] != [r["doc_id"] for r in records[160:320]]
-        or indices != set(range(amendment["first_case"], amendment["last_case_exclusive"]))
-    ):
+    found = round_amendment(plan, records)
+    if found is None:
         raise ValueError("rodada ativa difere do adendo pago autorizado")
-    return amendment_sha
+    return found[1]
 
 
-def execute_round(plan, records, states, accepted, frozen, root, *, paid_ling=None):
+def amendment_round_budgets(amendment):
+    """Tetos incrementais por modelo; o adendo historico v1 nao os define."""
+    if amendment is None or amendment["version"] == 1:
+        return {}
+    return {model: money(value) for model, value in amendment["round_budget_usd"].items()}
+
+
+def execute_round(
+    plan, records, states, accepted, frozen, root, *, paid_ling=None, round_budgets=None
+):
     errors = {}
     stop_event = Event()
+    round_budgets = round_budgets or {}
 
     def execute_model(model):
         error = None
@@ -235,6 +256,9 @@ def execute_round(plan, records, states, accepted, frozen, root, *, paid_ling=No
                 if states[model].records != records:
                     raise ValueError("coorte preparada diverge")
             kwargs = {"paid_ling": paid_ling} if model == "ling-free" and paid_ling else {}
+            # Ling gratuito custa zero por contrato; o teto so vale nos executores pagos.
+            if model in round_budgets and (model != "ling-free" or paid_ling):
+                kwargs["round_budget"] = round_budgets[model]
             run_selection(
                 states[model],
                 documents=plan["documents"],
@@ -303,7 +327,7 @@ def main():
     parser.add_argument(
         "--ling-paid-this-round",
         action="store_true",
-        help="usa adendo autorizado de Ling pago apenas na rodada ativa 161-320",
+        help="usa o adendo registrado de Ling pago cujo plano coincide com esta rodada",
     )
     args = parser.parse_args()
     if args.audit_ling_batch:
@@ -327,32 +351,58 @@ def main():
             update_metrics(records, states)
             return
         audit_batch(states["ling-free"], 1)
-        if args.ling_paid_this_round and not (ROOT / "active-round.json").exists():
-            raise ValueError("adendo Ling pago exige a rodada ativa 161-320")
-        plan = round_plan(ROOT, records, accepted, args.cases, persist=not args.dry_run)
+        # O plano so e salvo depois de casar com o adendo, se o Ling pago foi pedido.
+        plan = round_plan(ROOT, records, accepted, args.cases, persist=False)
         if plan is None:
             log("Os tres modelos ja concluiram todos os documentos; nenhuma geracao pendente")
             if not args.dry_run:
                 update_metrics(records, states)
             return
+        found = round_amendment(plan, records)
+        if args.ling_paid_this_round and found is None:
+            raise ValueError(
+                "rodada difere de todos os adendos de Ling pago registrados; nada foi salvo"
+            )
+        paid_ling = found[1] if args.ling_paid_this_round else None
+        budgets = amendment_round_budgets(found[0] if found else None)
+        if not args.dry_run:
+            plan = round_plan(ROOT, records, accepted, args.cases, persist=True)
         pending = remaining(records, plan["documents"], accepted)
-        paid_ling = paid_ling_for_plan(plan, records) if args.ling_paid_this_round else None
         preview = {
             "plan": plan,
             "pending_generations": pending,
             "preparation_pending": [m for m in MODELS if m not in states],
             "dry_run": args.dry_run,
+            "amendment_sha256": found[1] if found else None,
+            "ling_paid": paid_ling is not None,
+            "round_budget_usd": {model: str(value) for model, value in budgets.items()},
         }
         save(ROOT / "preview.json", preview)
         log(f"Rodada de {len(plan['documents'])} documentos; pendencias: {pending}")
+        if budgets:
+            log(
+                "Tetos incrementais desta rodada (custo retido nos casos da rodada): "
+                + "; ".join(f"{model} US${budgets[model]}" for model in MODELS)
+                + f"; total US${sum(budgets.values())}"
+            )
+        ling_cap = paid_ling_budgets(found[0])[0] if paid_ling else 0
         log(
-            f"Tetos cumulativos: Ling US${'2' if paid_ling else '0'}; "
+            f"Tetos cumulativos: Ling US${ling_cap}; "
             "Gemma US$9; Qwen geracao US$18; preparacao local US$0"
         )
         if args.dry_run:
             log("Validacao encerrada sem API. Nenhuma rodada ativa criada ou avancada")
             return
-        result = execute_round(plan, records, states, accepted, frozen, ROOT, paid_ling=paid_ling)
+        result = execute_round(
+            plan,
+            records,
+            states,
+            accepted,
+            frozen,
+            ROOT,
+            paid_ling=paid_ling,
+            round_budgets=budgets,
+        )
         log(
             f"Rodada {'concluida' if result['complete'] else 'pendente'}: "
             f"{result['pending_generations']}"

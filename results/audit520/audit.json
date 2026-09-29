@@ -1,0 +1,208 @@
+{
+  "scope": "first_520_eval_documents",
+  "documents": 520,
+  "accepted_responses": 9360,
+  "scores": 9360,
+  "unique_score_keys": 9360,
+  "lineage_checks": 9360,
+  "truncated_bert_texts": 0,
+  "company_split_overlap": 0,
+  "first_320_scores_unchanged": true,
+  "first_320_raw_artifacts_unchanged": true,
+  "hypotheses_tested": false,
+  "lock_id": "97ee50ac6e006be31e36420e7622de8d77e8ef6cd43275a2cc8e1afe16ddd8a1",
+  "metrics_method_id": "f3e072d2d42469aba49045814d2938c46fbffd902651574d4bc42db858551acc",
+  "scores_csv_sha256": "547ef7575c5da8d13a781717299ff62f00ecc49e0b85ef6a8a8cf0d8a8f5335b",
+  "summary_snapshot_sha256": "3c6981cdf1c127dc02626494f1d67e26957d3651dab4a0c464fcf5ef9ff151c7",
+  "amendments_sha256": {
+    "configs/ling-paid-round-161-320.json": "e7621072479ad9afec4e287e07c05d9d8a00adbb854526f1eba4a921e814d928",
+    "configs/ling-paid-round-321-520.json": "d4471a339f0e9cb89ca5f9626db666a1e09eba90d6d18c7ee1e5869d431cd160"
+  },
+  "round_321_520": {
+    "plan_id": "86ea3dd99dc40aad9ef7b3719d0a007ae9b63130d8c66c3fea33b95a62ed80f0",
+    "documents": 200,
+    "reported_cost_total_usd": "4.2115709764",
+    "models": {
+      "ling-free": {
+        "accepted": 1200,
+        "attempts": 1200,
+        "attempt_statuses": {
+          "accepted": 1200
+        },
+        "retries_by_kind": {},
+        "max_attempts_per_case": 1,
+        "request_model": "inclusionai/ling-3.0-flash-fin",
+        "request_provider": "novita",
+        "response_provider": "Novita",
+        "reported_cost_usd": "0.9667897064",
+        "held_cost_usd": "0.9667897064",
+        "round_cap_usd": "1.70",
+        "finish_reasons": {
+          "stop": 1197,
+          "length": 3
+        },
+        "amendment_sha256_counts": {
+          "d4471a339f0e9cb89ca5f9626db666a1e09eba90d6d18c7ee1e5869d431cd160": 1200
+        }
+      },
+      "qwen37": {
+        "accepted": 1200,
+        "attempts": 1267,
+        "attempt_statuses": {
+          "accepted": 1200,
+          "http429": 67
+        },
+        "retries_by_kind": {
+          "http_429": 67
+        },
+        "max_attempts_per_case": 2,
+        "request_model": "qwen/qwen3.7-flash",
+        "request_provider": "alibaba",
+        "response_provider": "Alibaba",
+        "reported_cost_usd": "2.01825198",
+        "held_cost_usd": "2.56711598",
+        "round_cap_usd": "3.40",
+        "finish_reasons": {
+          "stop": 1200
+        },
+        "amendment_sha256_counts": null
+      },
+      "gemma26": {
+        "accepted": 1200,
+        "attempts": 1207,
+        "attempt_statuses": {
+          "accepted": 1200,
+          "http429": 7
+        },
+        "retries_by_kind": {
+          "http_429": 7
+        },
+        "max_attempts_per_case": 2,
+        "request_model": "google/gemma-4-26b-a4b-it",
+        "request_provider": "darkbloom",
+        "response_provider": "Darkbloom",
+        "reported_cost_usd": "1.226529290",
+        "held_cost_usd": "1.253595658",
+        "round_cap_usd": "1.90",
+        "finish_reasons": {
+          "stop": 1172,
+          "length": 28
+        },
+        "amendment_sha256_counts": null
+      }
+    }
+  },
+  "model_checks": {
+    "ling-free": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "47a1ccb6e1efc6f647cdd30f30137d3887eeb94cbf20d141bf0f586d70806a1a",
+      "ledger_first_520_sha256": "6aa5c90cb58ac7c3561be2ae1da538d020ac0a7beef3029d87c1f9e7f5f9fb4c",
+      "ledger_history_before_round_preserved": true,
+      "accepted_first_520": 3120,
+      "request_models": {
+        "inclusionai/ling-3.0-flash-fin:free": 960,
+        "inclusionai/ling-3.0-flash-fin": 2160
+      },
+      "reported_cost_usd_by_round": {
+        "1-100": "0",
+        "101-160": "0",
+        "161-320": "0.7737356256",
+        "321-520": "0.9667897064"
+      },
+      "finish_reasons_by_round": {
+        "1-100": {
+          "stop": 600
+        },
+        "101-160": {
+          "stop": 360
+        },
+        "161-320": {
+          "stop": 957,
+          "length": 3
+        },
+        "321-520": {
+          "stop": 1197,
+          "length": 3
+        }
+      },
+      "length_first_520": 6,
+      "maximum_preflight_prompt_tokens_first_520": 42309
+    },
+    "qwen37": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "b0b73db554e250b5fe0c7e0e82c6bab73fae4ac878443523b8cabf9c5c919ae7",
+      "ledger_first_520_sha256": "b48967b80adb60c90a295d1b54f147404ab04574d1dd1fd328894a0df2d88977",
+      "ledger_history_before_round_preserved": true,
+      "accepted_first_520": 3120,
+      "request_models": {
+        "qwen/qwen3.7-flash": 3120
+      },
+      "reported_cost_usd_by_round": {
+        "1-100": "1.02208267",
+        "101-160": "0.61542519",
+        "161-320": "1.619776936",
+        "321-520": "2.01825198"
+      },
+      "finish_reasons_by_round": {
+        "1-100": {
+          "stop": 600
+        },
+        "101-160": {
+          "stop": 360
+        },
+        "161-320": {
+          "stop": 960
+        },
+        "321-520": {
+          "stop": 1200
+        }
+      },
+      "length_first_520": 0,
+      "maximum_preflight_prompt_tokens_first_520": 42014
+    },
+    "gemma26": {
+      "prepared_documents_sha256": "d0e45f586cdcc585e95abf6cc577db1774bb388fc06dd9d8c8f9aef138c2c92e",
+      "preflight_sha256": "0831355414b473df412c1525ab9f2b98493a97ccf68e2865e03f75ace5276db9",
+      "ledger_first_520_sha256": "cfdb50ca85fd0ad6652b53ccb1cf0fb75b53d7659270a6ca7524c6c21c35906f",
+      "ledger_history_before_round_preserved": true,
+      "accepted_first_520": 3120,
+      "request_models": {
+        "google/gemma-4-26b-a4b-it": 3120
+      },
+      "reported_cost_usd_by_round": {
+        "1-100": "0.618157042",
+        "101-160": "0.378971444",
+        "161-320": "1.019386158",
+        "321-520": "1.226529290"
+      },
+      "finish_reasons_by_round": {
+        "1-100": {
+          "length": 2,
+          "stop": 598
+        },
+        "101-160": {
+          "stop": 357,
+          "length": 3
+        },
+        "161-320": {
+          "stop": 948,
+          "length": 12
+        },
+        "321-520": {
+          "stop": 1172,
+          "length": 28
+        }
+      },
+      "length_first_520": 45,
+      "maximum_preflight_prompt_tokens_first_520": 42029
+    }
+  },
+  "raw_manifest_sha256": "bddf262c6056322f0bc704f14e1ca8501ef10e5d102387a2aa881973a81258a4",
+  "limitations": [
+    "Raw requests/responses and prepared artifacts are local in outputs and not in Git.",
+    "BERTScore is not recomputed here; the cache, CSV and token audit are cross-checked.",
+    "Embeddings and FAISS retrieval are not recomputed; frozen prompts are checked.",
+    "Factual correctness and numeric preservation are not evaluated by these scores.",
+    "Ling used the free endpoint for documents 1-160 and the paid endpoint of the same model and provider for 161-520; documents also differ between rounds."
+  ]
+}

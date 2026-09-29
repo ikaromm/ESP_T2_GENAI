@@ -6,9 +6,10 @@ Projeto de pós-graduação que compara seis configurações de sumarização no
 
 ![Acompanhamento FINDSum](results/progress/dashboard.png)
 
-**320 documentos concluídos nos três modelos: 5.760 respostas e scores.** Nas médias descritivas de BERTScore F1 e ROUGE-L, C1 supera C2, C2 supera C1t, C3 fica abaixo de C2 e C4 supera C3 nos três modelos. O ganho de C5 sobre C4 é menor. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
+**520 documentos concluídos nos três modelos: 9.360 respostas e scores.** O painel apresenta as médias descritivas por braço e modelo. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
 
 - [Painel atual, tabela e evolução cumulativa](results/progress/README.md)
+- [Auditoria congelada dos 520 documentos e custo da rodada 321–520](results/audit520/README.md)
 - [Auditoria dos 320 documentos e figura dos cinco contrastes](results/article320/README.md)
 - [Interpretação dos primeiros 100 documentos](docs/metricas-primeiros100-20260927.md)
 - [Snapshot dos scores e IDs dos primeiros 100](results/first100-20260927/)
@@ -28,18 +29,18 @@ bash rodar_rodada.sh --metrics-only # atualiza apenas métricas e painel, sem AP
 
 A preparação integral já existe neste workspace em `outputs/full-{ling,qwen,gemma}-prepared`. Uma nova instalação precisa do dataset, dos modelos locais e desses artefatos preparados; eles não estão no Git. O caminho da credencial é `../.env`, variável `OPEN_ROUTER_KEY`. Nunca adicione esse arquivo ao repositório.
 
-Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 320 estão gerados e pontuados; a próxima execução normal seleciona os documentos ainda não processados.
+Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. Os primeiros 520 estão gerados e pontuados; a próxima execução normal seleciona os documentos ainda não processados.
 
 A execução normal envia chamadas pagas de Qwen/Gemma. `--dry-run`, `--metrics-only` e `--audit-ling-batch 1` são modos locais. Não apague `outputs/full-rounds/active-round.json`, os ledgers ou as pastas de respostas para tentar avançar.
 
 | Modelo / provedor fixo | Ritmo máximo | Teto cumulativo de geração |
 |---|---:|---:|
 | Ling 3.0 Flash Fin gratuito / Novita | 20 RPM | US$ 0 |
-| Ling 3.0 Flash Fin pago / Novita, apenas documentos 161–320 | 500 RPM, adaptativo | US$ 2 |
+| Ling 3.0 Flash Fin pago / Novita, apenas rodadas com adendo registrado | 500 RPM, adaptativo | US$ 3,70 cumulativo após 321–520 |
 | Qwen3.7 Flash / Alibaba | 500 RPM, adaptativo | US$ 18 |
 | Gemma 4 26B A4B / Darkbloom | 500 RPM, adaptativo | US$ 9 |
 
-Os tetos não garantem vazão sustentada ou conclusão com esse saldo. Nos pagos, erros transitórios reduzem ritmo/concorrência, respeitam `Retry-After` e voltam à fila, com até seis tentativas por ciclo. Resultado de transporte desconhecido ou resposta fora do contrato exige auditoria. Não há troca automática de modelo/provedor. O Ling pago foi autorizado explicitamente para a rodada 161–320 e registrado em [adendo separado](configs/ling-paid-round-161-320.json); o comportamento padrão das próximas rodadas continua gratuito.
+Os tetos não garantem vazão sustentada ou conclusão com esse saldo. Nos pagos, erros transitórios reduzem ritmo/concorrência, respeitam `Retry-After` e voltam à fila, com até seis tentativas por ciclo. Resultado de transporte desconhecido ou resposta fora do contrato exige auditoria. Não há troca automática de modelo/provedor. O Ling pago foi autorizado para as rodadas [161–320](configs/ling-paid-round-161-320.json) e [321–520](configs/ling-paid-round-321-520.json), cada uma em adendo separado; o comportamento padrão das próximas rodadas continua gratuito. O adendo 321–520 também fixou tetos incrementais por modelo, somando US$ 7,00, sobre o custo retido das tentativas. Uma nova rodada paga exige novo adendo antes da execução.
 
 Ao encerrar, o Bash atualiza `results/progress/` usando somente o prefixo completo comum aos três modelos. Usa cache para evitar recálculo. Não faz commit ou push automaticamente:
 
@@ -105,4 +106,4 @@ uv run --locked ruff check src scripts tests
 
 O lock verifica código, dados, modelos locais, versões e compatibilidade dos artefatos preparados antes da geração. A migração de caminhos está documentada por hashes em `configs/repository-layout.json`; ela não autoriza alterações nos insumos científicos.
 
-Esta revisão passou em **316 testes** (excluindo `slow` e `test_real_data.py`), Ruff e verificação do lock. Os 5.760 scores têm IDs únicos e auditoria sem truncamento; os 2.880 scores anteriores permaneceram idênticos.
+Esta revisão passou na suíte automatizada sem `slow` e `test_real_data.py`, no Ruff e na verificação do lock. Os 9.360 scores têm IDs únicos e auditoria sem truncamento; os 5.760 scores anteriores permaneceram idênticos.

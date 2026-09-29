@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "scope": "explicit_paid_ling_for_active_round_only",
+  "authorized_on": "2026-09-29",
+  "cohort_positions": "321-520",
+  "plan_id": "86ea3dd99dc40aad9ef7b3719d0a007ae9b63130d8c66c3fea33b95a62ed80f0",
+  "requested_cases": 200,
+  "cohort_sha256": "723c0adc9dae5f0496c3bf1b9cd442c8d5d39aefb4f26dd5d38e8736351fe354",
+  "first_case": 1920,
+  "last_case_exclusive": 3120,
+  "free_model": "inclusionai/ling-3.0-flash-fin:free",
+  "paid_model": "inclusionai/ling-3.0-flash-fin",
+  "provider": "novita",
+  "max_input_usd_per_million": "0.042",
+  "max_output_usd_per_million": "0.1232",
+  "held_cost_definition": "accepted attempt: API-reported cost; any other attempt: its reserved maximum (49152 input and 8192 output tokens at the maximum prices)",
+  "budget_scope": "held_cost_of_attempts_in_amendment_cases",
+  "budget_usd": "1.70",
+  "cumulative_budget_usd": "3.70",
+  "round_budget_scope": "held_cost_of_each_model_attempts_in_amendment_cases",
+  "round_budget_usd": {
+    "ling-free": "1.70",
+    "qwen37": "3.40",
+    "gemma26": "1.90"
+  },
+  "round_budget_total_usd": "7.00",
+  "previous_amendments_sha256": [
+    "e7621072479ad9afec4e287e07c05d9d8a00adbb854526f1eba4a921e814d928"
+  ],
+  "reason": "On 2026-09-29 the OpenRouter catalog listed no provider for the free Ling endpoint. The user authorized paid Ling on the same Novita provider, without fallback, only for cohort positions 321-520 (cases 1920-3119), with a US$7.00 incremental safety ceiling for this round across the three models. Earlier responses and the 161-320 amendment remain unchanged."
+}

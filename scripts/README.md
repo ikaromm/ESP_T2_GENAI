@@ -30,10 +30,13 @@ uv run --locked python -m scripts.preparation.prepare_gemma_from_common \
 # Atualiza as métricas pela entrada que valida os artefatos:
 bash rodar_rodada.sh --metrics-only
 
-# Retoma somente a rodada histórica 161–320 com Ling pago no Novita,
-# conforme configs/ling-paid-round-161-320.json:
-bash rodar_rodada.sh 160 --ling-paid-this-round
+# Ling pago no Novita somente quando a rodada selecionada coincide com um adendo
+# registrado; 161–320 e 321–520 já estão concluídas e servem apenas para retomada:
+bash rodar_rodada.sh 200 --ling-paid-this-round   # configs/ling-paid-round-321-520.json
+bash rodar_rodada.sh 160 --ling-paid-this-round   # configs/ling-paid-round-161-320.json
 ```
+
+Uma nova autorização de Ling pago exige outro arquivo `configs/ling-paid-round-<faixa>.json`, sem editar os anteriores. Registre o SHA-256 do arquivo em `PAID_LING_AMENDMENTS` (`execution/run_prepared_paid.py`), preserve o lock atual em `configs/lock-history/` e recongele com os três `--compatible-prepared-lock`. O plano da rodada é conferido contra o adendo antes de ser salvo; cada tentativa paga grava o hash do adendo no ledger. O adendo v2 também fixa tetos incrementais de custo retido por modelo, medidos apenas nos casos da rodada.
 
 Preparações prontas não devem ser sobrescritas. Não execute `freeze_full_openrouter` sem `--verify` para contornar uma divergência: o congelamento novo exige revisão e preservação do lock anterior.
 

@@ -23,7 +23,8 @@ from scripts.execution.run_prepared_paid import (
     TARGETS,
     load_prepared,
     money,
-    paid_ling_amendment,
+    paid_ling_amendment_by_sha,
+    paid_ling_budgets,
     run,
     target_for_saved_attempt,
     validate_response,
@@ -180,9 +181,20 @@ def document_indices(records, documents):
 
 
 def run_selection(
-    state, *, documents=None, batch=None, execute=False, stop_event=None, paid_ling=None
+    state,
+    *,
+    documents=None,
+    batch=None,
+    execute=False,
+    stop_event=None,
+    paid_ling=None,
+    round_budget=None,
 ):
-    """Executor comum aos lotes fixos e ao Bash; um unico ledger/orcamento por modelo."""
+    """Executor comum aos lotes fixos e ao Bash; um unico ledger/orcamento por modelo.
+
+    `round_budget` limita o custo retido nas tentativas dos documentos selecionados,
+    alem do teto cumulativo congelado do modelo.
+    """
     with output_lock(state.output):
         accepted = state.accepted()
         report = export_progress(state.output, state.rows, state.records, accepted)
@@ -198,17 +210,28 @@ def run_selection(
             )
             label = f"Lote {selected}/10" if selected else "Todos os lotes completos"
         pending = indices - accepted
+        budget = state.budget
         if paid_ling is not None:
             if state.model != "ling-free":
                 raise ValueError("adendo pago exclusivo do Ling")
-            amendment, amendment_sha = paid_ling_amendment()
-            if paid_ling != amendment_sha or not indices <= set(
+            amendment = paid_ling_amendment_by_sha(paid_ling)
+            if not indices <= set(
                 range(amendment["first_case"], amendment["last_case_exclusive"])
             ):
                 raise ValueError("selecao fora do adendo pago autorizado")
+            budget, amendment_round = paid_ling_budgets(amendment)
+            if amendment_round is not None:
+                candidates = [amendment_round]
+                if round_budget is not None:
+                    candidates.append(money(round_budget))
+                round_budget = min(candidates)
+        if round_budget is not None:
+            round_budget = money(round_budget)
+            if documents is None or (state.model == "ling-free" and paid_ling is None):
+                raise ValueError("teto incremental exclusivo de rodadas pagas por documentos")
         log(f"{state.model}: {label}; {len(pending)} geracoes pendentes (sem retries)")
         if not execute:
-            log(f"Validado sem API; teto cumulativo: US$ {state.budget}")
+            log(f"Validado sem API; teto cumulativo: US$ {budget}")
             return report
         if pending:
             with activity("Conferindo recursos das metricas"):
@@ -223,8 +246,14 @@ def run_selection(
                 if type(remaining) is not int or remaining < 0:
                     raise ValueError("cota gratuita indisponivel; nao iniciar chamadas")
                 log(f"Cota restante: {remaining}")
-            budget = money(amendment["budget_usd"]) if paid_ling is not None else state.budget
-            log(f"Teto cumulativo: US$ {budget}; modelo {state.model}")
+            log(
+                f"Teto cumulativo: US$ {budget}; modelo {state.model}"
+                + (
+                    f"; teto incremental da rodada: US$ {round_budget}"
+                    if round_budget is not None
+                    else ""
+                )
+            )
             try:
                 if state.model == "ling-free" and paid_ling is None:
                     run(
@@ -257,6 +286,7 @@ def run_selection(
                         case_indices=indices,
                         stop_event=stop_event,
                         **({"amendment_sha256": paid_ling} if paid_ling is not None else {}),
+                        **({"round_budget": round_budget} if round_budget is not None else {}),
                     )
             finally:
                 report = export_progress(state.output, state.rows, state.records, state.accepted())

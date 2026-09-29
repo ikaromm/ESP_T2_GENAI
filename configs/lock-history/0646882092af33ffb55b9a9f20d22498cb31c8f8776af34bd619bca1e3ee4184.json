@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-29T11:48:59.529623+00:00",
+  "created_at": "2026-09-28T23:21:15.967358+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -23,10 +23,10 @@
     "scripts/evaluation/update_progress_metrics.py": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93",
     "scripts/execution/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/execution/run_experiment_openrouter.py": "15bf000b9ba5b6a8f4ada8aa0ba6398bc119b9c8cf74e993976f843bfffb61c2",
-    "scripts/execution/run_full_round.py": "8a0524236cee4496a7e66df849104a02e6d39ebecc994375e151581efacbc9a5",
-    "scripts/execution/run_ling_batches.py": "79d6d6e2835f5eb33925828deffc1d034424ae50fa100c462f48b47c3cf4693c",
-    "scripts/execution/run_paid_concurrent.py": "75ef8bafbacda16a37ef74f7284f184b38d656c93fa9983ffadd5c7cef94d5d7",
-    "scripts/execution/run_prepared_paid.py": "d68b482ff6a50de3b5ddf0acafc2fbc749340d670848cf6270a0b680b8ae5b84",
+    "scripts/execution/run_full_round.py": "9bb287bbcb2df5389ca98b66b83a33dce9b5b76ead872b38c60cfa022fc535e3",
+    "scripts/execution/run_ling_batches.py": "af9557a68d98cd8a836e0b424df1706749db99e52e77abad8ab3a51f7fd0e689",
+    "scripts/execution/run_paid_concurrent.py": "78a1c34dd71b75fb63f98ac03da64deb9a21fbe987ab3841bf570f329e6bc439",
+    "scripts/execution/run_prepared_paid.py": "ba54055e8ffef91a3e650ef55a7332ded4556f5d547295704e50091de0c50c85",
     "scripts/experiments/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/experiments/benchmark_paid_rates.py": "cccee57ba1532c0c0b6d6ec43d561b6e195d15c6b97fba07e07e4f4f4c2fa8fa",
     "scripts/experiments/budget_full_openrouter.py": "7692cbbd4ed430278eb973f8b6017d25f749c104282189f3f28235eb392ee8d4",
@@ -7237,5 +7237,5 @@
       "qwen37"
     ]
   },
-  "lock_id": "97ee50ac6e006be31e36420e7622de8d77e8ef6cd43275a2cc8e1afe16ddd8a1"
+  "lock_id": "0646882092af33ffb55b9a9f20d22498cb31c8f8776af34bd619bca1e3ee4184"
 }

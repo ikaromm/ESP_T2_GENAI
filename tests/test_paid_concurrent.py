@@ -196,3 +196,73 @@ def test_paid_ling_resumes_audited_free_404_as_new_attempt(core, tmp_path):
     assert attempts[-1]["retry_cycle_end"] == 7
     assert attempts[-1]["amendment_sha256"] == "a" * 64
     assert json.loads((tmp_path / "0960-1.request.json").read_text())["model"] == target[0]
+
+
+def embedded(good, code, provider=None):
+    response = json.loads(json.dumps(good))
+    response["provider"] = provider or response["provider"]
+    response["usage"].update(prompt_tokens=12, completion_tokens=4, cost=0)
+    response["choices"][0].update(
+        finish_reason="error",
+        error={"code": code, "message": "provider disconnected",
+               "metadata": {"error_type": "provider_unavailable"}},
+    )
+    response["choices"][0]["message"]["content"] = "partial text"
+    return response
+
+
+def test_embedded_transient_provider_error_is_retried_and_preserved(core, tmp_path):
+    clock, good, args, kwargs = setup(core, tmp_path)
+    replies = [embedded(good, 502), good]
+    calls = []
+
+    def request(*unused):
+        calls.append(clock())
+        return replies[len(calls) - 1]
+
+    core.run(*args, SimpleNamespace(_request=request), **kwargs)
+    assert len(calls) == 2 and calls[1] - calls[0] >= 1
+    attempts = json.loads((tmp_path / "ledger.json").read_text())["attempts"]
+    assert [a["status"] for a in attempts] == ["http_retryable", "accepted"]
+    first = attempts[0]
+    assert first["retry_classification"] == "embedded_provider_error"
+    assert first["embedded_error"]["code"] == 502 and "error" not in first
+    assert core.held_cost({"attempts": attempts[:1]}) == core.money(first["reserved_usd"])
+    saved = json.loads((tmp_path / "0000-0.response.json").read_text())
+    assert saved["choices"][0]["finish_reason"] == "error"
+    assert json.loads((tmp_path / "adaptive-rate.json").read_text())["rpm"] == 250
+    core.run(*args, SimpleNamespace(_request=request), **kwargs)
+    assert len(calls) == 2
+
+
+def test_embedded_retryable_attempt_resumes_after_interruption(core, tmp_path):
+    clock, good, args, kwargs = setup(core, tmp_path)
+    stop = threading.Event()
+
+    def failing(*unused):
+        stop.set()
+        return embedded(good, 503)
+
+    with pytest.raises(ValueError, match="interrompido"):
+        core.run(*args, SimpleNamespace(_request=failing), stop_event=stop, **kwargs)
+    clock.now += 5
+    core.run(*args, SimpleNamespace(_request=lambda *unused: good), **kwargs)
+    attempts = json.loads((tmp_path / "ledger.json").read_text())["attempts"]
+    assert [a["status"] for a in attempts] == ["http_retryable", "accepted"]
+
+
+@pytest.mark.parametrize("code,provider", [(400, None), ("502", None), (502, "OtherProvider")])
+def test_non_transient_or_foreign_embedded_error_requires_audit(core, tmp_path, code, provider):
+    _clock, good, args, kwargs = setup(core, tmp_path)
+    calls = []
+
+    def request(*unused):
+        calls.append(1)
+        return embedded(good, code, provider)
+
+    for _ in range(2):
+        with pytest.raises(ValueError, match="auditoria"):
+            core.run(*args, SimpleNamespace(_request=request), **kwargs)
+    assert calls == [1]
+    attempt = json.loads((tmp_path / "ledger.json").read_text())["attempts"][0]
+    assert attempt["status"] == "audit_required" and "embedded_error" not in attempt
