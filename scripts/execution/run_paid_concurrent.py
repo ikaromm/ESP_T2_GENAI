@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import math
 import random
@@ -75,6 +76,40 @@ def held_cost(ledger, cases=None):
         ),
         money(0),
     )
+
+
+def validate_interruption_audit(entry, output, row, target):
+    """Retoma perda de resposta somente apos auditoria explicita e rastreavel."""
+    try:
+        audit_path = (output / entry["interruption_audit_file"]).resolve()
+        if not audit_path.is_relative_to(output.resolve()):
+            raise ValueError
+        raw = audit_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != entry["interruption_audit_sha256"]:
+            raise ValueError
+        audit = json.loads(raw)
+        if (
+            audit.get("scope") != "process_interruption_without_saved_response"
+            or audit.get("execution_stopped") is not True
+            or audit.get("retry_authorized") is not True
+        ):
+            raise ValueError
+        matches = [
+            a for a in audit["attempts"]
+            if (a["case"], a["response_file"]) == (entry["case"], entry["response_file"])
+        ]
+        if len(matches) != 1 or matches[0].get("status_before") != "pending":
+            raise ValueError
+        response = output / entry["response_file"]
+        request = output / entry["response_file"].replace(".response.", ".request.")
+        if (
+            response.exists()
+            or hashlib.sha256(request.read_bytes()).hexdigest() != matches[0]["request_sha256"]
+            or json.loads(request.read_text()) != request_payload(target, row)
+        ):
+            raise ValueError
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        raise ValueError("auditoria da interrupcao ausente ou invalida") from exc
 
 
 def invoke(transport, payload):
@@ -186,7 +221,9 @@ def run(
                     raise ValueError("request aceita diverge")
                 validate_response(json.loads(response_path.read_text()), target, rows[index])
                 continue
-            if old and old[-1]["status"] not in {"http429", "http_retryable"}:
+            if old and old[-1]["status"] == "audited_interruption":
+                validate_interruption_audit(old[-1], output, rows[index], target)
+            elif old and old[-1]["status"] not in {"http429", "http_retryable"}:
                 raise ValueError("tentativa incerta/rejeitada exige auditoria antes de retomar")
             end = old[-1].get("retry_cycle_end", 6) if old else 6
             if old and amendment_sha256 is not None:

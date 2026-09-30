@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-09-30T03:02:06.190148+00:00",
+  "created_at": "2026-09-30T00:03:49.089518+00:00",
   "state": "frozen_not_executed",
   "generation_backend": "openrouter_only",
   "files": {
@@ -20,13 +20,13 @@
     "scripts/evaluation/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/evaluation/audit_example_metrics.py": "96db9fb3df949ec9aae14c3f0d1c924c9b5ea0e4121037f73068a3538544895e",
     "scripts/evaluation/extend_reference_metrics.py": "b6c597b6ca3b7d1060c75d41d8d4c0654a484074ade0c6dbf789f9ae1271c029",
-    "scripts/evaluation/render_readable_progress.py": "8e156bb3ef67b3307805f2d2af4facd33ee72f9c513a49ed744d83c87335908f",
+    "scripts/evaluation/render_readable_progress.py": "47c7d87d0ef8d3aaae2fde9d4074c70117fa1798067b1a75bb7ac8d33bb90032",
     "scripts/evaluation/update_progress_metrics.py": "63aae00cda6676b4ecbd4cd5600589473d23eead777c1fc1ad5d4595449bfa93",
     "scripts/execution/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/execution/run_experiment_openrouter.py": "15bf000b9ba5b6a8f4ada8aa0ba6398bc119b9c8cf74e993976f843bfffb61c2",
-    "scripts/execution/run_full_round.py": "b0b9fef238bb318cf0f166292265e212db08b001fd66216a0c01b3ceb3e1dd8b",
-    "scripts/execution/run_ling_batches.py": "cbcc45be759f8e0261a017d52c7a3a1ac8051c39e4558863da8a1a9ddcf13340",
-    "scripts/execution/run_paid_concurrent.py": "f9ac5ea965cebbadfadf7ae0fc150d942bc18d72cbd808f6f7773d7364f9981a",
+    "scripts/execution/run_full_round.py": "5e136737803eed5d6cf9279c20b0d80b2488211363129a009d1b87a7ccb8c19f",
+    "scripts/execution/run_ling_batches.py": "79d6d6e2835f5eb33925828deffc1d034424ae50fa100c462f48b47c3cf4693c",
+    "scripts/execution/run_paid_concurrent.py": "75ef8bafbacda16a37ef74f7284f184b38d656c93fa9983ffadd5c7cef94d5d7",
     "scripts/execution/run_prepared_paid.py": "441261b2a1f562a4a74b73a2a55ac39ad5e7c69253563c9d0c05b218c15affe4",
     "scripts/experiments/__init__.py": "b589c1842ebedee75b21bc6a681ebb376561663f7cfc219d7931c52f81c30720",
     "scripts/experiments/benchmark_paid_rates.py": "cccee57ba1532c0c0b6d6ec43d561b6e195d15c6b97fba07e07e4f4f4c2fa8fa",
@@ -7238,5 +7238,5 @@
       "gemma26"
     ]
   },
-  "lock_id": "7a46030f94a98e1284c277cbdd6f37d8bfe78403b45f90d3f7258b2b378d79dc"
+  "lock_id": "9200e42f761de85f6ec969aaa471435e89d593bcabe01d909c4f0014a6f6815d"
 }

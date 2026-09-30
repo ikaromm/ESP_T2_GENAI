@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
 import subprocess
 import sys
 from collections import Counter
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 
+from findsum_rag.analyze import ANALYSIS_PLAN, compare_hypotheses
 from findsum_rag.full_lock import DEFAULT_LOCK, verify_full_lock
 from findsum_rag.progress import log
 from scripts.evaluation.render_readable_progress import render_readable_progress
@@ -41,7 +45,59 @@ ROOT = Path("outputs/full-rounds")
 def refresh_progress(records, states):
     """Calcula somente pares pendentes e atualiza as figuras legiveis a partir do resumo."""
     update_metrics(records, states)
+    publish_full_comparisons(records)
     render_readable_progress()
+
+
+def publish_full_comparisons(records, out=Path("results/progress")):
+    """Aplica o plano congelado ao CSV completo; nenhuma repontuacao ou API."""
+    summary = json.loads((out / "summary.json").read_text())
+    if summary["documents_compared"] != 1000 or len(records) != 1000:
+        return
+    ids = [r["doc_id"] for r in records]
+    if summary["document_ids"] != ids or summary["expected_documents"] != 1000:
+        raise ValueError("matriz final diverge da coorte congelada")
+    path = out / "scores.csv"
+    with path.open() as handle:
+        rows = list(csv.DictReader(handle))
+    keys = {(r["model"], r["doc_id"], r["arm"]) for r in rows}
+    expected = {(m, d, a) for m in MODELS for d in ids for a in ARMS}
+    if len(rows) != 18000 or keys != expected:
+        raise ValueError("matriz final incompleta ou com pares duplicados")
+    families = {}
+    for model in MODELS:
+        groups = {arm: {} for arm in ARMS}
+        for row in rows:
+            if row["model"] == model:
+                groups[row["arm"]][row["doc_id"]] = {
+                    k: float(row[k]) for k in ("bertscore", "rougeL")
+                }
+        families[model] = [asdict(c) for c in compare_hypotheses(groups)]
+        if len(families[model]) != 10 or any(c["n_pairs"] != 1000 for c in families[model]):
+            raise ValueError("familia confirmatoria incompleta")
+    save(out / "comparisons.json", families)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(
+        buffer, fieldnames=["model", *families[MODELS[0]][0]], lineterminator="\n"
+    )
+    writer.writeheader()
+    writer.writerows(dict(model=m, **c) for m, family in families.items() for c in family)
+    temporary = out / "comparisons.csv.tmp"
+    temporary.write_text(buffer.getvalue(), encoding="utf-8")
+    temporary.replace(out / "comparisons.csv")
+    save(out / "analysis.json", {
+        "documents": 1000,
+        "tests": 30,
+        "tests_per_model": 10,
+        "analysis_plan": ANALYSIS_PLAN,
+        "method_id": summary["method_id"],
+        "scores_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "comparisons_sha256": hashlib.sha256((out / "comparisons.json").read_bytes()).hexdigest(),
+        "comparisons_csv_sha256": hashlib.sha256(
+            (out / "comparisons.csv").read_bytes()
+        ).hexdigest(),
+    })
+    log("Analise final: 30 testes; 1000 pares; Holm em dez testes por modelo; sem API")
 
 
 def checksum(data):

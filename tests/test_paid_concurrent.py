@@ -1,5 +1,6 @@
 """Retries adaptativos e orcamento concorrente, sem API real."""
 
+import hashlib
 import importlib
 import json
 import threading
@@ -104,6 +105,49 @@ def test_timeout_is_not_repeated_and_budget_remains_reserved(core, tmp_path):
     assert calls == [1]
     ledger = json.loads((tmp_path / "ledger.json").read_text())
     assert core.held_cost(ledger) == core.reservation(args[1], args[0][0])
+
+
+def test_audited_process_interruption_retries_once_without_releasing_reserve(core, tmp_path):
+    clock, good, args, kwargs = setup(core, tmp_path)
+    rows, target, output, _budget, identity = args
+    reserve = core.reservation(target, rows[0])
+    request = output / "0000-0.request.json"
+    request.write_text(json.dumps(core.request_payload(target, rows[0])))
+    report = {
+        "scope": "process_interruption_without_saved_response",
+        "execution_stopped": True,
+        "retry_authorized": True,
+        "attempts": [{
+            "case": 0, "response_file": "0000-0.response.json", "status_before": "pending",
+            "request_sha256": hashlib.sha256(request.read_bytes()).hexdigest(),
+        }],
+    }
+    audit = output / "interruption-audit.json"
+    audit.write_text(json.dumps(report))
+    entry = {
+        "case": 0, "doc_id": "d", "arm": "C1", "reserved_usd": str(reserve),
+        "status": "audited_interruption", "at": clock() - 100,
+        "response_file": "0000-0.response.json", "retry_cycle_end": 6,
+        "interruption_audit_file": audit.name,
+        "interruption_audit_sha256": hashlib.sha256(audit.read_bytes()).hexdigest(),
+    }
+    (output / "ledger.json").write_text(json.dumps({"identity": identity, "attempts": [entry]}))
+    calls = []
+
+    def request_once(*unused):
+        calls.append(1)
+        return good
+
+    client = SimpleNamespace(_request=request_once)
+    core.run(*args, client, **kwargs)
+    core.run(*args, client, **kwargs)
+    ledger = json.loads((output / "ledger.json").read_text())
+    assert calls == [1]
+    assert [a["status"] for a in ledger["attempts"]] == ["audited_interruption", "accepted"]
+    assert core.held_cost(ledger) == reserve + core.money(good["usage"]["cost"])
+    audit.write_text(json.dumps(report | {"retry_authorized": False}))
+    with pytest.raises(ValueError, match="auditoria da interrupcao"):
+        core.validate_interruption_audit(entry, output, rows[0], target)
 
 
 def test_budget_inflight_drain_then_stop_without_overcommit(core, tmp_path):

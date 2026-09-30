@@ -1,0 +1,108 @@
+{
+  "checked_at": "2026-09-30T03:02:52.342038+00:00",
+  "documents": 1000,
+  "new_documents": 480,
+  "models": {
+    "ling-free": {
+      "accepted_total": 6000,
+      "new_accepted": 2880,
+      "reported_round_cost_usd": "2.2359676584",
+      "held_round_cost_usd": "2.3742813864",
+      "round_budget_usd": "3.20",
+      "new_input_tokens": 64088362,
+      "new_output_tokens": 1690188,
+      "new_finish_reasons": {
+        "stop": 2875,
+        "length": 5
+      },
+      "round_attempt_statuses": {
+        "accepted": 2880,
+        "audited_interruption": 45
+      },
+      "ledger_sha256": "1e0ea347693e15e276f5abf59e95ffc27691551c7e2b0662b726d94834652b3f"
+    },
+    "qwen37": {
+      "accepted_total": 6000,
+      "new_accepted": 2880,
+      "reported_round_cost_usd": "4.74901985",
+      "held_round_cost_usd": "4.92105185",
+      "round_budget_usd": "7.30",
+      "new_input_tokens": 63963510,
+      "new_output_tokens": 1783812,
+      "new_finish_reasons": {
+        "stop": 2880
+      },
+      "round_attempt_statuses": {
+        "accepted": 2880,
+        "http429": 21
+      },
+      "ledger_sha256": "3da6a628404383278a47fa2281aa8f6af5ccc730784653affb870508a82c9bd6"
+    },
+    "gemma26": {
+      "accepted_total": 6000,
+      "new_accepted": 2880,
+      "reported_round_cost_usd": "3.054231238",
+      "held_round_cost_usd": "3.112230598",
+      "round_budget_usd": "3.50",
+      "new_input_tokens": 63727679,
+      "new_output_tokens": 1716676,
+      "new_finish_reasons": {
+        "stop": 2838,
+        "length": 42
+      },
+      "round_attempt_statuses": {
+        "http429": 11,
+        "accepted": 2880,
+        "http_retryable": 4
+      },
+      "ledger_sha256": "10c4e4a06a013087da4ac3c5104b29b88fa8f116fefd17a9047fcb1055488164"
+    }
+  },
+  "scientific_changes": false,
+  "scores": 18000,
+  "original_scores_preserved": 9360,
+  "original_raw_generations_preserved": 9360,
+  "bertscore_full_coverage": true,
+  "method_id": "f3e072d2d42469aba49045814d2938c46fbffd902651574d4bc42db858551acc",
+  "progress_panel_hypotheses_tested": false,
+  "confirmatory_tests_validated": 30,
+  "reported_round_total_usd": "10.0392187464",
+  "held_round_total_usd": "10.4075638344",
+  "account": {
+    "available_before_usd": "14.283195579",
+    "available_after_usd": "4.214863199",
+    "observed_debit_usd": "10.068332380",
+    "debit_minus_accepted_cost_usd": "0.0291136336"
+  },
+  "published_comparisons_source": "results/progress/scores.csv",
+  "published_comparisons_sha256": "9d4264d69f6db9d2ea9dcbcde6d58487fda3d70c12b6647d70743de38a7f0746",
+  "published_scores_sha256": "a67857e290071670edb863e815608513012d250f6f16e86068d683701d1fd3d4",
+  "raw_manifest_sha256": "d72487a16a80c847d4773d2096c08a0103b5ec59fe6e0ffd28ae4943cf87ebd8",
+  "score_reuse": [
+    {
+      "at": "2026-09-30T01:27:37.419034+00:00",
+      "model": "ling-free",
+      "method_id": "f3e072d2d42469aba49045814d2938c46fbffd902651574d4bc42db858551acc",
+      "reused_pairs": 2880,
+      "previously_cached_pairs_preserved": 9360,
+      "max_previous_float_difference": 1.7881393432617188e-07,
+      "source_hashes": {
+        "outputs/full-ling-batches/ling-free/results/C1/scores.csv": "1a0dff54ea0f45cadd025a4525563b3958ab142bd59c1444d1f29d61ae4a4e63",
+        "outputs/full-ling-batches/ling-free/results/C1/predictions.jsonl": "8f0803354a0f9db8580248a02d9e20248c5c836485c9c9dd74211371999be689",
+        "outputs/full-ling-batches/ling-free/results/C1t/scores.csv": "eb7802c4df255593f017943147228e74d38b50c174ff401dffb0bb19d9869eb0",
+        "outputs/full-ling-batches/ling-free/results/C1t/predictions.jsonl": "d4ab91714db133069060b115ff1bb9746d6235cf4aee491bc04284fb2d56a6a6",
+        "outputs/full-ling-batches/ling-free/results/C2/scores.csv": "dd0842bea4a982cc5260307ba399ca70d4ec309042588718269822772c16116f",
+        "outputs/full-ling-batches/ling-free/results/C2/predictions.jsonl": "30f42a63b7cfc9cb85e3845630ce0aa22259299a5c3920db87abba9216f0fd59",
+        "outputs/full-ling-batches/ling-free/results/C3/scores.csv": "041984b89a0537a5bc34cefd3c91d64f12aeff69c9db997663da4d2ddc88ce85",
+        "outputs/full-ling-batches/ling-free/results/C3/predictions.jsonl": "d22a2b617d6be2e79f211b3e743ab65bfd28fecbc3d56fa88148c8c17cab09d4",
+        "outputs/full-ling-batches/ling-free/results/C4/scores.csv": "1ec235a360d42940ee58863385d667cf74276e67d2c019bc5537650d24601207",
+        "outputs/full-ling-batches/ling-free/results/C4/predictions.jsonl": "f8a15ea51a5855fd6c352defd4abb102535c00fe925d9ab0e2734955a9a2e7e8",
+        "outputs/full-ling-batches/ling-free/results/C5/scores.csv": "5c0b4477cd7a644562366c554f8910d4768abd92b3991afd7a02d0f177324979",
+        "outputs/full-ling-batches/ling-free/results/C5/predictions.jsonl": "6e6d226649570b086d2f5725578ccfe4d63d518983c58bbf4ae456e0ad14f00e"
+      },
+      "inputs_verified": true,
+      "source": "frozen_full_model_scores",
+      "api_calls": 0
+    }
+  ]
+}

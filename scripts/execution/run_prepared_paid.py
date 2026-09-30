@@ -91,6 +91,10 @@ PAID_LING_AMENDMENTS = (
         Path("configs/ling-paid-round-321-520.json"),
         "d4471a339f0e9cb89ca5f9626db666a1e09eba90d6d18c7ee1e5869d431cd160",
     ),
+    (
+        Path("configs/ling-paid-round-521-1000.json"),
+        "dbe2d4b877ca2c7ff2d6b2cead2ab00abbd1a3da0ddeadd88043a49968a83fb1",
+    ),
 )
 PAID_LING_AMENDMENT = PAID_LING_AMENDMENTS[0][0]
 ROUND_BUDGET_MODELS = {"ling-free", "qwen37", "gemma26"}

@@ -31,7 +31,9 @@ A evolução é cumulativa, com pontos a cada 100 documentos e no prefixo atual,
 - `summary.json`: médias, cobertura, IDs, método, hashes dos ledgers e auditoria de tokens.
 - `history.json`: pontos cumulativos usados no gráfico.
 
-O Bash chama `scripts.evaluation.render_readable_progress` depois de calcular as métricas. Esse passo usa apenas `summary.json` e `history.json`: cria o painel 2×2, figuras PNG/SVG individuais com eixos ampliados e atualiza as tabelas de hipóteses nos dois READMEs. O código científico de pontuação e o identificador do cache não mudam. Os eixos ampliados são identificados em cada figura e permitem ler diferenças pequenas; a tabela preserva os valores exatos. Para refazer somente a apresentação, sem validar os 6.000 prompts de cada modelo: `uv run --locked python -m scripts.evaluation.render_readable_progress`.
+O Bash calcula os pares ausentes no cache uma única vez. O término da geração de cada modelo não dispara uma segunda pontuação integral dos 6.000 pares. Aos 1.000 documentos completos, ele aplica o plano congelado diretamente ao CSV versionado e grava `comparisons.csv`, `comparisons.json` e `analysis.json`: 30 testes, com Holm em dez testes por modelo, sem repontuar os textos. Matrizes incompletas, duplicadas ou com métricas primárias não finitas são rejeitadas.
+
+Depois, `scripts.evaluation.render_readable_progress` usa as médias e o histórico para criar o painel 2×2, figuras PNG/SVG individuais com eixos ampliados e atualizar os dois READMEs. O link para os testes completos depende dos hashes do CSV e das comparações registrados em `analysis.json`. O código científico de pontuação e o identificador do cache não mudam. Os eixos ampliados são identificados em cada figura e permitem ler diferenças pequenas; a tabela preserva os valores exatos. Para refazer somente a apresentação, sem validar os 6.000 prompts de cada modelo: `uv run --locked python -m scripts.evaluation.render_readable_progress`.
 
 O README principal referencia a imagem atualizada. O Bash prepara os arquivos; **não executa commit/push automaticamente**. Para publicar apenas a nova medição:
 
@@ -47,10 +49,12 @@ Se uma geração falhar, os outros modelos continuam conforme a política existe
 
 Textos muito longos podem exceder a memória da GPU no BERTScore (ocorreu com 11,6 GiB nas rodadas 161–320 e 321–520). Os blocos já salvos permanecem no cache; retome em CPU, sem geração: `CUDA_VISIBLE_DEVICES=-1 OMP_NUM_THREADS=4 bash rodar_rodada.sh --metrics-only`. O modelo, a camada e a configuração são os mesmos; muda só o dispositivo, e podem existir diferenças mínimas de ponto flutuante entre CPU e GPU.
 
-Este painel é descritivo. Não calcula p-valores, não confirma hipóteses e não modifica prompts ou RAG a partir dos resultados parciais. A rotina confirmatória da pipeline continua separada e condicionada aos 1.000 documentos por modelo.
+As médias e figuras deste painel são descritivas. Os p-valores ficam na tabela confirmatória separada, gerada pelo Bash somente com os 1.000 documentos completos nos três modelos. Essa análise usa BERTScore F1 e ROUGE-L F1; precisão/recall, ROUGE-1/2 e METEOR continuam descritivos. H3 mede sensibilidade e não demonstra equivalência quando não significativa. O fluxo não modifica prompts ou RAG a partir dos resultados de eval.
 
 ## Validação desta implementação
 
 Em 27/09/2026, `bash rodar_rodada.sh --metrics-only` terminou com os 100 documentos atuais e 1.800 pares. As métricas por documento e as médias reproduziram o snapshot publicado (diferença máxima nas médias inferior a `1e-15`). Os hashes dos três ledgers continuaram iguais, confirmando que a atualização não gerou respostas.
 
 Uma segunda atualização do mesmo conjunto reutilizou o cache integral, com zero recálculos e todos os arquivos do painel idênticos byte a byte. PNG inspecionado visualmente. Suíte: 308 testes aprovados, excluindo `slow` e `test_real_data.py`; Ruff, sintaxe Bash e verificação de whitespace aprovados.
+
+Em 29/09/2026 (conclusão em 30/09 UTC), a coorte de 1.000 documentos terminou com 18.000 pares únicos. A atualização incremental preservou os 9.360 scores publicados aos 520 documentos; reaproveitou os 2.880 novos scores do Ling já calculados com o mesmo método e calculou somente os 5.760 pares novos de Qwen/Gemma. O identificador científico do cache permaneceu inalterado. A auditoria confirmou todos os hashes dos requests e respostas, a igualdade C1t/C2 de orçamento, o mesmo contexto em C2–C5 e cobertura integral de tokens nas métricas. Os 30 testes finais estão em `results/progress/comparisons.csv`; custos, proveniência e verificações em [results/audit1000](../results/audit1000/README.md). Foram aprovados 338 testes sem `slow`/`test_real_data.py` e 20 testes direcionados após a correção de exportação CSV; Ruff, whitespace e lock também passaram.

@@ -9,10 +9,11 @@ Projeto de pós-graduação que compara **seis configurações** de sumarizaçã
 [BERTScore ampliado](results/progress/bertscore-f1.svg) · [ROUGE-L ampliado](results/progress/rouge-l-f1.svg) · [METEOR ampliado](results/progress/meteor.svg) · [Evolução ampliada](results/progress/evolucao.svg)
 
 <!-- progress-summary:start -->
-**520 documentos concluídos nos três modelos: 9.360 respostas e scores.** O painel apresenta as médias descritivas por braço e modelo. Ainda não há teste confirmatório das hipóteses: ele depende da coorte final completa.
+**1.000 documentos concluídos nos três modelos: 18.000 respostas e scores.** O painel apresenta as médias descritivas por braço e modelo. [Testes das hipóteses na coorte completa](results/progress/comparisons.csv).
 <!-- progress-summary:end -->
 
 - [Painel atual, tabela e evolução cumulativa](results/progress/README.md)
+- [Experimento completo: testes das hipóteses, custos e auditoria dos 1.000 documentos](results/audit1000/README.md)
 - [Auditoria congelada dos 520 documentos e custo da rodada 321–520](results/audit520/README.md)
 - [Auditoria dos 320 documentos e figura dos cinco contrastes](results/article320/README.md)
 - [Interpretação dos primeiros 100 documentos](docs/metricas-primeiros100-20260927.md)
@@ -22,7 +23,7 @@ Projeto de pós-graduação que compara **seis configurações** de sumarizaçã
 
 <!-- hypotheses-progress:start -->
 
-## Hipóteses e observações parciais
+## Hipóteses e contrastes observados
 
 Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo significa maior similaridade média com a referência no primeiro braço; Δ negativo, menor. As diferenças abaixo são pontos da escala 0 a 1, não percentuais de acerto.
 
@@ -36,31 +37,33 @@ Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo signifi
 
 H3 é um **controle de sensibilidade** à escolha dos exemplos: uma diferença não significativa ao final não provaria equivalência. As métricas primárias são BERTScore F1 e ROUGE-L F1; METEOR e BERTScore precisão/recall são descritivos.
 
-**Recorte atual: 520 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
+**Recorte atual: 1000 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
 
 | Modelo | Hipótese | Δ BERTScore F1 | Δ ROUGE-L F1 |
 |---|---|---:|---:|
-| Ling Flash Fin | H1 | -0,0366 | -0,0214 |
-| Ling Flash Fin | H1b | +0,0322 | +0,0275 |
-| Ling Flash Fin | H2 | -0,0182 | -0,0090 |
-| Ling Flash Fin | H3 | +0,0119 | +0,0081 |
-| Ling Flash Fin | H4 | +0,0040 | +0,0017 |
-| Qwen3.7 Flash | H1 | -0,0388 | -0,0229 |
-| Qwen3.7 Flash | H1b | +0,0060 | +0,0124 |
-| Qwen3.7 Flash | H2 | -0,0043 | -0,0116 |
-| Qwen3.7 Flash | H3 | +0,0137 | +0,0112 |
-| Qwen3.7 Flash | H4 | +0,0077 | +0,0033 |
-| Gemma 4 26B A4B | H1 | -0,0365 | -0,0243 |
-| Gemma 4 26B A4B | H1b | +0,0302 | +0,0167 |
-| Gemma 4 26B A4B | H2 | -0,0101 | -0,0072 |
-| Gemma 4 26B A4B | H3 | +0,0094 | +0,0069 |
-| Gemma 4 26B A4B | H4 | +0,0067 | +0,0061 |
+| Ling Flash Fin | H1 | -0,0356 | -0,0222 |
+| Ling Flash Fin | H1b | +0,0346 | +0,0307 |
+| Ling Flash Fin | H2 | -0,0178 | -0,0085 |
+| Ling Flash Fin | H3 | +0,0108 | +0,0068 |
+| Ling Flash Fin | H4 | +0,0054 | +0,0022 |
+| Qwen3.7 Flash | H1 | -0,0382 | -0,0227 |
+| Qwen3.7 Flash | H1b | +0,0061 | +0,0136 |
+| Qwen3.7 Flash | H2 | -0,0053 | -0,0112 |
+| Qwen3.7 Flash | H3 | +0,0147 | +0,0104 |
+| Qwen3.7 Flash | H4 | +0,0075 | +0,0044 |
+| Gemma 4 26B A4B | H1 | -0,0372 | -0,0239 |
+| Gemma 4 26B A4B | H1b | +0,0256 | +0,0156 |
+| Gemma 4 26B A4B | H2 | -0,0092 | -0,0071 |
+| Gemma 4 26B A4B | H3 | +0,0096 | +0,0074 |
+| Gemma 4 26B A4B | H4 | +0,0074 | +0,0058 |
 
 Nos três modelos, **H1 é negativa** e **H1b é positiva**: o RAG ficou abaixo da fonte inteira, mas acima do prefixo com o mesmo orçamento de contexto. **H2 é negativa**: quatro exemplos fixos reduziram as duas métricas primárias frente ao RAG sem exemplos. **H3 e H4 são positivas**, com ganho menor em H4. Isso descreve este recorte e não estabelece eficácia causal ou qualidade factual.
 
-**Nenhuma hipótese foi confirmada ou refutada aqui.** O teste predefinido usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo, somente depois dos 1.000 documentos. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
+**Este painel apresenta diferenças descritivas.** Os testes completos estão na tabela de comparações, calculados a partir do CSV versionado. O plano usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
 
 <!-- hypotheses-progress:end -->
+
+A análise completa detectou diferenças em **28 dos 30 testes**. Isso não confirma cinco hipóteses de melhora: H1 e H2 tiveram diferenças negativas nos três modelos. H1b no BERTScore do Qwen (p Holm = 0,1229) e H4 no ROUGE-L do Ling (p Holm = 0,0732) não foram significativas. Veja os [testes, tamanhos de efeito e limites de interpretação](results/audit1000/README.md). A última rodada de 480 documentos custou **US$ 10,0683 de débito observado**, deixando **US$ 4,2149** na conta consultada.
 
 ## Executar uma rodada
 
@@ -77,18 +80,24 @@ A preparação integral já existe neste workspace em `outputs/full-{ling,qwen,g
 
 Cada documento tem **seis gerações por modelo**, além de retries. O script preserva a rodada incompleta e as respostas aceitas. Só avança para outro grupo na próxima invocação após a rodada atual estar completa. O prefixo gerado e pontuado está no painel acima; a próxima execução normal seleciona os documentos ainda não processados.
 
+A coorte de 1.000 documentos está concluída: neste workspace, não há casos faltantes para novas chamadas. Preserve os artefatos; não remova respostas para repetir o experimento. `--metrics-only` permite conferir e reconstruir o painel a partir das gerações salvas.
+
 A execução normal envia chamadas pagas de Qwen/Gemma. `--dry-run`, `--metrics-only` e `--audit-ling-batch 1` são modos locais. Não apague `outputs/full-rounds/active-round.json`, os ledgers ou as pastas de respostas para tentar avançar.
 
 | Modelo / provedor fixo | Ritmo máximo | Teto cumulativo de geração |
 |---|---:|---:|
 | Ling 3.0 Flash Fin gratuito / Novita | 20 RPM | US$ 0 |
-| Ling 3.0 Flash Fin pago / Novita, apenas rodadas com adendo registrado | 500 RPM, adaptativo | US$ 3,70 cumulativo após 321–520 |
+| Ling 3.0 Flash Fin pago / Novita, apenas rodadas com adendo registrado | 500 RPM, adaptativo | US$ 5,00 cumulativo após autorização de 521–1000 |
 | Qwen3.7 Flash / Alibaba | 500 RPM, adaptativo | US$ 18 |
 | Gemma 4 26B A4B / Darkbloom | 500 RPM, adaptativo | US$ 9 |
 
-Os tetos não garantem vazão sustentada ou conclusão com esse saldo. Nos pagos, erros transitórios reduzem ritmo/concorrência, respeitam `Retry-After` e voltam à fila, com até seis tentativas por ciclo. Resultado de transporte desconhecido ou resposta fora do contrato exige auditoria. Não há troca automática de modelo/provedor. O Ling pago foi autorizado para as rodadas [161–320](configs/ling-paid-round-161-320.json) e [321–520](configs/ling-paid-round-321-520.json), cada uma em adendo separado; o comportamento padrão das próximas rodadas continua gratuito. O adendo 321–520 também fixou tetos incrementais por modelo, somando US$ 7,00, sobre o custo retido das tentativas. Uma nova rodada paga exige novo adendo antes da execução.
+Os tetos não garantem vazão sustentada ou conclusão com esse saldo. Nos pagos, erros transitórios reduzem ritmo/concorrência, respeitam `Retry-After` e voltam à fila, com até seis tentativas por ciclo. Resultado de transporte desconhecido ou resposta fora do contrato exige auditoria. Não há troca automática de modelo/provedor. O Ling pago foi autorizado para as rodadas [161–320](configs/ling-paid-round-161-320.json), [321–520](configs/ling-paid-round-321-520.json) e [521–1000](configs/ling-paid-round-521-1000.json), cada uma em adendo separado; o comportamento padrão continua gratuito. O adendo 521–1000 fixa tetos incrementais de US$ 3,20 para Ling, US$ 7,30 para Qwen e US$ 3,50 para Gemma: US$ 14,00 sobre o custo retido das tentativas, abaixo do saldo inicial consultado de US$ 14,2832. Uma nova rodada paga exige novo adendo antes da execução.
+
+Uma tentativa interrompida sem resposta salva conserva sua reserva máxima de custo. Sua retomada exige uma auditoria local com SHA-256, conferência do request congelado e confirmação de que a resposta não existe. O script nunca repete uma resposta já aceita.
 
 Ao encerrar, o Bash atualiza `results/progress/` usando somente o prefixo completo comum aos três modelos. Usa cache para evitar recálculo. Não faz commit ou push automaticamente:
+
+A avaliação calcula somente os pares ausentes no cache comum, em blocos de 120, com cobertura integral dos textos. O término de cada modelo não recalcula os 6.000 pares separadamente. Com os 1.000 documentos completos nos três modelos, o Bash também grava `comparisons.csv`, `comparisons.json` e `analysis.json`, aplicando o plano congelado ao CSV versionado. Os testes não exigem chamadas adicionais à API.
 
 ```bash
 git add results/progress README.md
@@ -168,9 +177,9 @@ Antes da geração, os **6.000 prompts de cada modelo** (1.000 alvos × seis bra
 
 ### Hipóteses, métricas e alcance dos resultados
 
-Os **cinco contrastes pré-definidos** estão na [tabela de hipóteses e observações parciais](#hipóteses-e-observações-parciais): H1 (`C2−C1`) pergunta se selecionar trechos supera usar toda a fonte; H1b (`C2−C1t`) separa a **seleção** do efeito de reduzir o tamanho do contexto; H2 (`C3−C2`) testa acrescentar quatro exemplos fixos; H3 (`C4−C3`) mede a sensibilidade à troca dos exemplos fixos por sorteados; H4 (`C5−C4`) compara seleção por similaridade com sorteio. H3 não é teste de equivalência: um resultado sem significância não demonstra que C3 e C4 sejam iguais.
+Os **cinco contrastes pré-definidos** estão na [tabela de hipóteses e contrastes observados](#hipóteses-e-contrastes-observados): H1 (`C2−C1`) pergunta se selecionar trechos supera usar toda a fonte; H1b (`C2−C1t`) separa a **seleção** do efeito de reduzir o tamanho do contexto; H2 (`C3−C2`) testa acrescentar quatro exemplos fixos; H3 (`C4−C3`) mede a sensibilidade à troca dos exemplos fixos por sorteados; H4 (`C5−C4`) compara seleção por similaridade com sorteio. H3 não é teste de equivalência: um resultado sem significância não demonstra que C3 e C4 sejam iguais.
 
-As métricas primárias são **BERTScore F1 e ROUGE-L F1** contra o resumo de referência de cada alvo. BERTScore precisão/recall, ROUGE-1/2 e METEOR são descritivas. BERTScore usa `xlnet-base-cased`, camada 5, sem IDF/reescala e com cobertura do texto integral por janelas, sem corte definitivo em 512 tokens. Diferenças são medidas nos **mesmos documentos** em cada par de braços e para cada modelo separadamente. Somente após completar os 1.000 documentos, a análise confirmatória usa **Wilcoxon bilateral emparelhado**, correção **Holm nos dez testes por modelo** (cinco contrastes × duas métricas), alfa 0,05, e rejeita dados incompletos. As médias e os gráficos atuais são descritivos; nenhuma hipótese está confirmada pelo recorte parcial.
+As métricas primárias são **BERTScore F1 e ROUGE-L F1** contra o resumo de referência de cada alvo. BERTScore precisão/recall, ROUGE-1/2 e METEOR são descritivas. BERTScore usa `xlnet-base-cased`, camada 5, sem IDF/reescala e com auditoria da cobertura integral dos tokens, sem corte definitivo em 512 tokens. Diferenças são medidas nos **mesmos documentos** em cada par de braços e para cada modelo separadamente. Com os 1.000 documentos completos, a análise confirmatória usa **Wilcoxon bilateral emparelhado**, correção **Holm nos dez testes por modelo** (cinco contrastes × duas métricas), alfa 0,05, e rejeita dados incompletos. As médias e os gráficos do painel são descritivos; os [30 testes finais e sua interpretação](results/audit1000/README.md) são apresentados separadamente.
 
 Essas métricas estimam semelhança com a referência, **não a porcentagem de fatos corretos**. O protocolo atual não inclui avaliação numérica separada nem revisão humana. Os resultados dizem respeito a empresas reservadas **dentro do FINDSum**, sem demonstrar generalização para outro corpus. Também não atribuímos diferenças entre modelos apenas à arquitetura: tokenizadores e provedores variam.
 
@@ -178,7 +187,7 @@ Essas métricas estimam semelhança com a referência, **não a porcentagem de f
 
 O [manifesto](data/interim/splits-liquidity.json), a [ordem da coorte](configs/full-eval-cohort.csv), a [configuração científica](configs/full_openrouter.yaml), os [modelos e limites](configs/openrouter_full.json), o [lock](configs/full_openrouter.lock.json), o código e as [métricas individuais versionadas](results/progress/scores.csv) registram seleção, parâmetros e resultados. Localmente, `outputs/full-{ling,qwen,gemma}-prepared/` conserva textos de entrada, contextos, IDs dos exemplos, prompts, contagens de tokens e preflight; `outputs/full-{ling,qwen,gemma}-batches/` conserva tentativas e respostas, e `outputs/full-rounds/` registra os planos de execução. O dataset bruto e esses artefatos locais **não estão no Git**: os resultados exatos não podem ser recalculados apenas a partir de um clone, sem o dataset e as respostas arquivadas. A publicação externa desses artefatos ainda depende do depósito planejado.
 
-Coorte, parâmetros e versões permanecem congelados. Não ajustamos o protocolo com base nas métricas parciais de eval. `findsum verify-full` valida o lock antes de gerar ou recalcular os resultados.
+Coorte, parâmetros e versões permanecem congelados. Não ajustamos o protocolo com base nas métricas parciais de eval. `findsum verify-full` valida o lock antes de gerar ou recalcular os resultados. A auditoria final também depende de `outputs/round-521-1000-20260929/`, que guarda os backups anteriores à rodada, a auditoria da interrupção, a proveniência do reaproveitamento de scores e o monitoramento do saldo; inclua essa pasta no depósito externo.
 
 ## Verificação
 
@@ -190,4 +199,4 @@ uv run --locked ruff check src scripts tests
 
 O lock verifica código, dados, modelos locais, versões e compatibilidade dos artefatos preparados antes da geração. A migração de caminhos está documentada por hashes em `configs/repository-layout.json`; ela não autoriza alterações nos insumos científicos.
 
-Esta revisão passou na suíte automatizada sem `slow` e `test_real_data.py`, no Ruff e na verificação do lock. Os scores auditados têm IDs únicos e cobertura integral do texto; o [snapshot dos primeiros 520 documentos](results/audit520/README.md) permanece congelado.
+Esta revisão passou em **338 testes** da suíte sem `slow` e `test_real_data.py`; a correção posterior da exportação CSV passou nos 20 testes de `test_full_round.py`. Ruff e verificação do lock também passaram. Os scores auditados têm IDs únicos e cobertura integral do texto; o [snapshot dos primeiros 520 documentos](results/audit520/README.md) permanece congelado.

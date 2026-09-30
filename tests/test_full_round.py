@@ -1,5 +1,6 @@
 """Rodadas comuns e retomadas, sem geracoes reais."""
 
+import csv
 import importlib
 import json
 from pathlib import Path
@@ -135,6 +136,83 @@ def test_finished_ling_selection_never_opens_api(rounds, tmp_path, monkeypatch):
     monkeypatch.setattr(batcher, "OpenRouterFreeClient", forbidden)
     report = batcher.run_selection(state, documents=[str(i) for i in range(100)], execute=True)
     assert report["accepted_generations"] == 600
+
+
+def test_complete_cohort_defers_metrics_without_opening_api(rounds, tmp_path, monkeypatch):
+    batcher = importlib.import_module("scripts.execution.run_ling_batches")
+    records = cohort()
+    rows = [{"doc_id": r["doc_id"], "arm": arm} for r in records for arm in batcher.ARMS]
+    state = batcher.PreparedRun(
+        "ling-free", tmp_path, tmp_path, records, rows, None, {}, batcher.money(0)
+    )
+    monkeypatch.setattr(batcher.PreparedRun, "accepted", lambda _: set(range(6000)))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("API ou repontuacao durante exportacao de geracao completa")
+
+    monkeypatch.setattr(batcher, "OpenRouterFreeClient", forbidden)
+    monkeypatch.setattr(batcher, "ensure_meteor_resources", forbidden)
+    report = batcher.run_selection(state, documents=[str(i) for i in range(1000)], execute=True)
+    assert report["complete"] and report["accepted_generations"] == 6000
+    assert not (tmp_path / "ling-free/results").exists()
+
+
+def final_matrix(rounds, path):
+    (path / "summary.json").write_text(json.dumps({
+        "documents_compared": 1000, "expected_documents": 1000,
+        "document_ids": [str(i) for i in range(1000)], "method_id": "frozen-method",
+    }))
+    rows = [{"model": m, "doc_id": str(i), "arm": arm,
+             "bertscore": .5 + a * .001 + (i % 7) * .0001,
+             "rougeL": .15 + a * .001 + (i % 7) * .0001}
+            for m in rounds.MODELS for i in range(1000) for a, arm in enumerate(rounds.ARMS)]
+    write_matrix(path, rows)
+    return rows
+
+
+def write_matrix(path, rows):
+    with (path / "scores.csv").open("w") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_confirmatory_analysis_only_after_full_matrix(rounds, tmp_path):
+    (tmp_path / "summary.json").write_text(json.dumps({"documents_compared": 520}))
+    rounds.publish_full_comparisons(cohort(), tmp_path)
+    assert not (tmp_path / "comparisons.json").exists()
+    final_matrix(rounds, tmp_path)
+    rounds.publish_full_comparisons(cohort(), tmp_path)
+    families = json.loads((tmp_path / "comparisons.json").read_text())
+    assert set(families) == set(rounds.MODELS)
+    assert all(len(f) == 10 and all(c["n_pairs"] == 1000 for c in f) for f in families.values())
+    with (tmp_path / "comparisons.csv").open() as handle:
+        exported = list(csv.DictReader(handle))
+    assert len(exported) == 30 and {r["model"] for r in exported} == set(rounds.MODELS)
+    assert all(int(r["n_pairs"]) == 1000 for r in exported)
+    metadata = json.loads((tmp_path / "analysis.json").read_text())
+    assert metadata["tests"] == 30 and metadata["tests_per_model"] == 10
+    assert metadata["scores_sha256"] == rounds.hashlib.sha256(
+        (tmp_path / "scores.csv").read_bytes()
+    ).hexdigest()
+    assert metadata["comparisons_csv_sha256"] == rounds.hashlib.sha256(
+        (tmp_path / "comparisons.csv").read_bytes()
+    ).hexdigest()
+
+
+@pytest.mark.parametrize("defect", ["duplicate", "missing", "nonfinite"])
+def test_confirmatory_analysis_rejects_invalid_matrix(rounds, tmp_path, defect):
+    rows = final_matrix(rounds, tmp_path)
+    if defect == "duplicate":
+        rows[-1] = rows[0]
+    elif defect == "missing":
+        rows.pop()
+    else:
+        rows[-1]["bertscore"] = float("nan")
+    write_matrix(tmp_path, rows)
+    with pytest.raises(ValueError):
+        rounds.publish_full_comparisons(cohort(), tmp_path)
+    assert not (tmp_path / "comparisons.json").exists()
 
 
 def test_audit_checks_failed_requests_too(rounds, tmp_path):

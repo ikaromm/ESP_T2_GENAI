@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -31,6 +32,22 @@ ROOT_START = "<!-- hypotheses-progress:start -->"
 ROOT_END = "<!-- hypotheses-progress:end -->"
 ROOT_SUMMARY_START = "<!-- progress-summary:start -->"
 ROOT_SUMMARY_END = "<!-- progress-summary:end -->"
+
+
+def full_analysis_available(summary: dict) -> bool:
+    path = Path("results/progress/analysis.json")
+    if summary["documents_compared"] != 1000 or not path.exists():
+        return False
+    data = json.loads(path.read_text())
+    scores = Path("results/progress/scores.csv")
+    comparisons = Path("results/progress/comparisons.json")
+    return (
+        data["documents"] == 1000
+        and data["tests"] == 30
+        and data["method_id"] == summary["method_id"]
+        and data["scores_sha256"] == hashlib.sha256(scores.read_bytes()).hexdigest()
+        and data["comparisons_sha256"] == hashlib.sha256(comparisons.read_bytes()).hexdigest()
+    )
 
 
 def focused_limits(values: list[float]) -> tuple[float, float]:
@@ -152,14 +169,15 @@ def render_figures(out: Path, summary: dict, history: list[dict]) -> None:
                ncol=3, frameon=False)
     fig.text(0.08, 0.045,
              "Eixos ampliados e identificados em cada painel. Evolução: pontos acumulados; "
-             "testes confirmatórios após 1.000 documentos.", fontsize=11, color="#475569")
+             "testes confirmatórios na tabela separada aos 1.000 documentos.",
+             fontsize=11, color="#475569")
     save_figure(fig, out, "dashboard")
     plt.close(fig)
 
 
 def hypotheses_markdown(summary: dict) -> str:
     lines = [
-        "## Hipóteses e observações parciais",
+        "## Hipóteses e contrastes observados",
         "",
         "Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo significa "
         "maior similaridade média com a referência no primeiro braço; Δ negativo, menor. "
@@ -198,9 +216,13 @@ def hypotheses_markdown(summary: dict) -> str:
         "frente ao RAG sem exemplos. **H3 e H4 são positivas**, com ganho menor em H4. "
         "Isso descreve este recorte e não estabelece eficácia causal ou qualidade factual.",
         "",
-        "**Nenhuma hipótese foi confirmada ou refutada aqui.** O teste predefinido usa "
-        "Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo, somente "
-        "depois dos 1.000 documentos. As saídas `length` permanecem na análise e "
+        ("**Este painel apresenta diferenças descritivas.** Os testes completos estão "
+         "na tabela de comparações, calculados a partir do CSV versionado. "
+         if full_analysis_available(summary)
+         else "**Nenhuma hipótese foi confirmada ou refutada neste recorte parcial.** "
+         "O teste predefinido será executado aos 1.000 documentos completos. ")
+        + "O plano usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo. "
+        "As saídas `length` permanecem na análise e "
         "podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, "
         "tokenizador ou provedor.",
     ]
@@ -265,8 +287,13 @@ def update_root_readme(summary: dict) -> None:
         ROOT_SUMMARY_START + "\n"
         f"**{docs_label} documentos concluídos nos três modelos: "
         f"{scores_label} respostas e scores.** "
-        "O painel apresenta as médias descritivas por braço e modelo. Ainda não há "
-        "teste confirmatório das hipóteses: ele depende da coorte final completa.\n"
+        "O painel apresenta as médias descritivas por braço e modelo. "
+        + (
+            "[Testes das hipóteses na coorte completa](results/progress/comparisons.csv).\n"
+            if full_analysis_available(summary)
+            else "Ainda não há teste confirmatório das hipóteses: "
+            "ele depende da coorte final completa.\n"
+        )
         + ROOT_SUMMARY_END
     )
     path.write_text(re.sub(summary_pattern, lambda _: summary_block, content, flags=re.S))

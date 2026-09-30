@@ -2,6 +2,8 @@
 
 ![Painel das métricas](dashboard.png)
 
+[Experimento completo: 30 testes, custos e auditoria](../audit1000/README.md) · [Comparações em CSV](comparisons.csv)
+
 <!-- readable-progress:start -->
 
 **Gráficos ampliados:** os quatro painéis têm eixos verticais focados na faixa observada e limites visíveis. Abra os SVGs para ampliar sem perda de nitidez.
@@ -21,7 +23,7 @@
 
 ![Evolução cumulativa ampliada](evolucao.png)
 
-## Hipóteses e observações parciais
+## Hipóteses e contrastes observados
 
 Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo significa maior similaridade média com a referência no primeiro braço; Δ negativo, menor. As diferenças abaixo são pontos da escala 0 a 1, não percentuais de acerto.
 
@@ -35,33 +37,33 @@ Cada contraste usa os **mesmos documentos** em dois braços. Δ positivo signifi
 
 H3 é um **controle de sensibilidade** à escolha dos exemplos: uma diferença não significativa ao final não provaria equivalência. As métricas primárias são BERTScore F1 e ROUGE-L F1; METEOR e BERTScore precisão/recall são descritivos.
 
-**Recorte atual: 520 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
+**Recorte atual: 1000 documentos por modelo.** Contrastes entre médias dos braços, arredondados a quatro casas:
 
 | Modelo | Hipótese | Δ BERTScore F1 | Δ ROUGE-L F1 |
 |---|---|---:|---:|
-| Ling Flash Fin | H1 | -0,0366 | -0,0214 |
-| Ling Flash Fin | H1b | +0,0322 | +0,0275 |
-| Ling Flash Fin | H2 | -0,0182 | -0,0090 |
-| Ling Flash Fin | H3 | +0,0119 | +0,0081 |
-| Ling Flash Fin | H4 | +0,0040 | +0,0017 |
-| Qwen3.7 Flash | H1 | -0,0388 | -0,0229 |
-| Qwen3.7 Flash | H1b | +0,0060 | +0,0124 |
-| Qwen3.7 Flash | H2 | -0,0043 | -0,0116 |
-| Qwen3.7 Flash | H3 | +0,0137 | +0,0112 |
-| Qwen3.7 Flash | H4 | +0,0077 | +0,0033 |
-| Gemma 4 26B A4B | H1 | -0,0365 | -0,0243 |
-| Gemma 4 26B A4B | H1b | +0,0302 | +0,0167 |
-| Gemma 4 26B A4B | H2 | -0,0101 | -0,0072 |
-| Gemma 4 26B A4B | H3 | +0,0094 | +0,0069 |
-| Gemma 4 26B A4B | H4 | +0,0067 | +0,0061 |
+| Ling Flash Fin | H1 | -0,0356 | -0,0222 |
+| Ling Flash Fin | H1b | +0,0346 | +0,0307 |
+| Ling Flash Fin | H2 | -0,0178 | -0,0085 |
+| Ling Flash Fin | H3 | +0,0108 | +0,0068 |
+| Ling Flash Fin | H4 | +0,0054 | +0,0022 |
+| Qwen3.7 Flash | H1 | -0,0382 | -0,0227 |
+| Qwen3.7 Flash | H1b | +0,0061 | +0,0136 |
+| Qwen3.7 Flash | H2 | -0,0053 | -0,0112 |
+| Qwen3.7 Flash | H3 | +0,0147 | +0,0104 |
+| Qwen3.7 Flash | H4 | +0,0075 | +0,0044 |
+| Gemma 4 26B A4B | H1 | -0,0372 | -0,0239 |
+| Gemma 4 26B A4B | H1b | +0,0256 | +0,0156 |
+| Gemma 4 26B A4B | H2 | -0,0092 | -0,0071 |
+| Gemma 4 26B A4B | H3 | +0,0096 | +0,0074 |
+| Gemma 4 26B A4B | H4 | +0,0074 | +0,0058 |
 
 Nos três modelos, **H1 é negativa** e **H1b é positiva**: o RAG ficou abaixo da fonte inteira, mas acima do prefixo com o mesmo orçamento de contexto. **H2 é negativa**: quatro exemplos fixos reduziram as duas métricas primárias frente ao RAG sem exemplos. **H3 e H4 são positivas**, com ganho menor em H4. Isso descreve este recorte e não estabelece eficácia causal ou qualidade factual.
 
-**Nenhuma hipótese foi confirmada ou refutada aqui.** O teste predefinido usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo, somente depois dos 1.000 documentos. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
+**Este painel apresenta diferenças descritivas.** Os testes completos estão na tabela de comparações, calculados a partir do CSV versionado. O plano usa Wilcoxon bilateral emparelhado e Holm sobre dez testes por modelo. As saídas `length` permanecem na análise e podem afetar as médias. Os contrastes entre modelos não isolam arquitetura, tokenizador ou provedor.
 
 <!-- readable-progress:end -->
 
-**520/1000 documentos no prefixo comum completo.** Atualização local automática pelo Bash, sem chamadas de geração adicionais para as métricas.
+**1000/1000 documentos no prefixo comum completo.** Atualização local automática pelo Bash, sem chamadas de geração adicionais para as métricas.
 
 Somente os documentos consecutivos da ordem congelada com seis respostas aceitas em todos os modelos entram na matriz. Pendências de um modelo não alteram a base de comparação. Progresso individual aparece nos cartões.
 
@@ -69,24 +71,24 @@ Resultados descritivos: sem p-valores ou confirmação de hipóteses. A rotina c
 
 | Modelo | Braço | BERT P | BERT R | BERT F1 | ROUGE-L | METEOR |
 |---|---|---:|---:|---:|---:|---:|
-| Ling Flash Fin | C1 | 0.7279 | 0.6070 | 0.6609 | 0.1657 | 0.1663 |
-| Ling Flash Fin | C1t | 0.6549 | 0.5436 | 0.5920 | 0.1168 | 0.1126 |
-| Ling Flash Fin | C2 | 0.7009 | 0.5644 | 0.6243 | 0.1443 | 0.1302 |
-| Ling Flash Fin | C3 | 0.6775 | 0.5498 | 0.6061 | 0.1353 | 0.1258 |
-| Ling Flash Fin | C4 | 0.6889 | 0.5620 | 0.6180 | 0.1434 | 0.1342 |
-| Ling Flash Fin | C5 | 0.6956 | 0.5644 | 0.6220 | 0.1451 | 0.1363 |
-| Qwen3.7 Flash | C1 | 0.7314 | 0.6167 | 0.6681 | 0.1672 | 0.1660 |
-| Qwen3.7 Flash | C1t | 0.6792 | 0.5785 | 0.6232 | 0.1319 | 0.1313 |
-| Qwen3.7 Flash | C2 | 0.7015 | 0.5722 | 0.6292 | 0.1443 | 0.1338 |
-| Qwen3.7 Flash | C3 | 0.7206 | 0.5540 | 0.6249 | 0.1327 | 0.1030 |
-| Qwen3.7 Flash | C4 | 0.7294 | 0.5704 | 0.6386 | 0.1439 | 0.1210 |
-| Qwen3.7 Flash | C5 | 0.7398 | 0.5764 | 0.6463 | 0.1473 | 0.1240 |
-| Gemma 4 26B A4B | C1 | 0.7143 | 0.5781 | 0.6374 | 0.1470 | 0.1249 |
-| Gemma 4 26B A4B | C1t | 0.6700 | 0.5040 | 0.5706 | 0.1061 | 0.0881 |
-| Gemma 4 26B A4B | C2 | 0.6826 | 0.5384 | 0.6009 | 0.1227 | 0.0976 |
-| Gemma 4 26B A4B | C3 | 0.6928 | 0.5168 | 0.5908 | 0.1155 | 0.0804 |
-| Gemma 4 26B A4B | C4 | 0.6984 | 0.5284 | 0.6003 | 0.1224 | 0.0914 |
-| Gemma 4 26B A4B | C5 | 0.7027 | 0.5363 | 0.6070 | 0.1285 | 0.0996 |
+| Ling Flash Fin | C1 | 0.7302 | 0.6049 | 0.6607 | 0.1674 | 0.1647 |
+| Ling Flash Fin | C1t | 0.6559 | 0.5404 | 0.5905 | 0.1145 | 0.1091 |
+| Ling Flash Fin | C2 | 0.7033 | 0.5642 | 0.6252 | 0.1452 | 0.1295 |
+| Ling Flash Fin | C3 | 0.6806 | 0.5499 | 0.6073 | 0.1367 | 0.1259 |
+| Ling Flash Fin | C4 | 0.6921 | 0.5601 | 0.6181 | 0.1435 | 0.1327 |
+| Ling Flash Fin | C5 | 0.6990 | 0.5646 | 0.6235 | 0.1457 | 0.1362 |
+| Qwen3.7 Flash | C1 | 0.7324 | 0.6158 | 0.6679 | 0.1677 | 0.1654 |
+| Qwen3.7 Flash | C1t | 0.6807 | 0.5779 | 0.6236 | 0.1314 | 0.1296 |
+| Qwen3.7 Flash | C2 | 0.7042 | 0.5711 | 0.6297 | 0.1450 | 0.1331 |
+| Qwen3.7 Flash | C3 | 0.7230 | 0.5515 | 0.6243 | 0.1338 | 0.1023 |
+| Qwen3.7 Flash | C4 | 0.7325 | 0.5691 | 0.6391 | 0.1442 | 0.1204 |
+| Qwen3.7 Flash | C5 | 0.7412 | 0.5760 | 0.6466 | 0.1485 | 0.1247 |
+| Gemma 4 26B A4B | C1 | 0.7156 | 0.5766 | 0.6371 | 0.1463 | 0.1231 |
+| Gemma 4 26B A4B | C1t | 0.6739 | 0.5069 | 0.5742 | 0.1068 | 0.0882 |
+| Gemma 4 26B A4B | C2 | 0.6832 | 0.5364 | 0.5998 | 0.1224 | 0.0966 |
+| Gemma 4 26B A4B | C3 | 0.6942 | 0.5159 | 0.5906 | 0.1154 | 0.0796 |
+| Gemma 4 26B A4B | C4 | 0.6996 | 0.5276 | 0.6002 | 0.1227 | 0.0910 |
+| Gemma 4 26B A4B | C5 | 0.7056 | 0.5357 | 0.6077 | 0.1285 | 0.0983 |
 
 [Scores por documento](scores.csv) · [Resumo e cobertura](summary.json) · [Histórico cumulativo](history.json)
 

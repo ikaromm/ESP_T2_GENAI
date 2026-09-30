@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "scope": "explicit_paid_ling_for_active_round_only",
+  "authorized_on": "2026-09-29",
+  "cohort_positions": "521-1000",
+  "plan_id": "bd630a6e952d9331421768aa2248037d44bf4e14557911d8dde3d41e54b7e35d",
+  "requested_cases": 480,
+  "cohort_sha256": "723c0adc9dae5f0496c3bf1b9cd442c8d5d39aefb4f26dd5d38e8736351fe354",
+  "first_case": 3120,
+  "last_case_exclusive": 6000,
+  "free_model": "inclusionai/ling-3.0-flash-fin:free",
+  "paid_model": "inclusionai/ling-3.0-flash-fin",
+  "provider": "novita",
+  "max_input_usd_per_million": "0.042",
+  "max_output_usd_per_million": "0.1232",
+  "held_cost_definition": "accepted attempt: API-reported cost; any other attempt: its reserved maximum (49152 input and 8192 output tokens at the maximum prices)",
+  "budget_scope": "held_cost_of_attempts_in_amendment_cases",
+  "budget_usd": "3.20",
+  "cumulative_budget_usd": "5.00",
+  "round_budget_scope": "held_cost_of_each_model_attempts_in_amendment_cases",
+  "round_budget_usd": {
+    "ling-free": "3.20",
+    "qwen37": "7.30",
+    "gemma26": "3.50"
+  },
+  "round_budget_total_usd": "14.00",
+  "account_available_before_usd": "14.283195579",
+  "estimated_remaining_without_retries_usd": "12.1067696092",
+  "previous_amendments_sha256": [
+    "e7621072479ad9afec4e287e07c05d9d8a00adbb854526f1eba4a921e814d928",
+    "d4471a339f0e9cb89ca5f9626db666a1e09eba90d6d18c7ee1e5869d431cd160"
+  ],
+  "reason": "The user requested processing the remaining 480 documents and monitoring credit sufficiency. Paid Ling continues on Novita, Qwen on Alibaba and Gemma on Darkbloom, without fallback or scientific changes, only for frozen cohort positions 521-1000. OpenRouter reported US$14.283195579 available before generation. The round is capped at US$14.00 of held cost across models; earlier responses and amendments are preserved."
+}

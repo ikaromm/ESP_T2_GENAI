@@ -1,0 +1,53 @@
+{
+  "documents": 1000,
+  "tests": 30,
+  "tests_per_model": 10,
+  "analysis_plan": {
+    "version": 3,
+    "bertscore_model": "xlnet-base-cased",
+    "bertscore_truncation": "reject",
+    "scope": "reference_similarity_only",
+    "descriptive_metrics": [
+      "rouge1",
+      "rouge2"
+    ],
+    "hypotheses": [
+      [
+        "H1",
+        "C2",
+        "C1"
+      ],
+      [
+        "H1b",
+        "C2",
+        "C1t"
+      ],
+      [
+        "H2",
+        "C3",
+        "C2"
+      ],
+      [
+        "H3",
+        "C4",
+        "C3"
+      ],
+      [
+        "H4",
+        "C5",
+        "C4"
+      ]
+    ],
+    "primary_metrics": [
+      "bertscore",
+      "rougeL"
+    ],
+    "correction": "Holm over all 10 tests",
+    "test": "paired two-sided Wilcoxon",
+    "H3": "sensitivity control; non-significance does not establish equivalence"
+  },
+  "method_id": "f3e072d2d42469aba49045814d2938c46fbffd902651574d4bc42db858551acc",
+  "scores_sha256": "a67857e290071670edb863e815608513012d250f6f16e86068d683701d1fd3d4",
+  "comparisons_sha256": "680fc077adf189fdae38d3ab6bd0400b605fa7386721de12bce65e3c7337570c",
+  "comparisons_csv_sha256": "f1b74805622b25870efbec9154d3b477358bf4ba0e9cea2c6194869910a12571"
+}

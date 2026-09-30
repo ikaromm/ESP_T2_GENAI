@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from threading import Lock
 
 from findsum_rag.config import ExperimentConfig
 from findsum_rag.full_lock import verify_full_lock
@@ -18,7 +17,7 @@ from findsum_rag.metrics import ensure_meteor_resources
 from findsum_rag.openrouter import OpenRouterFreeClient
 from findsum_rag.progress import activity, log
 from scripts.common.full_common import ARMS, Limits, selected_records
-from scripts.execution.run_experiment_openrouter import load_key, score_results
+from scripts.execution.run_experiment_openrouter import load_key
 from scripts.execution.run_prepared_paid import (
     TARGETS,
     load_prepared,
@@ -30,8 +29,6 @@ from scripts.execution.run_prepared_paid import (
     validate_response,
 )
 from scripts.experiments.screen_openrouter import save
-
-METRICS_LOCK = Lock()
 
 
 def batch_indices(records, rows):
@@ -291,21 +288,10 @@ def run_selection(
             finally:
                 report = export_progress(state.output, state.rows, state.records, state.accepted())
         if report["complete"]:
-            with (
-                activity(f"Metricas dos 1000 documentos (uma etapa por vez): {state.model}"),
-                METRICS_LOCK,
-            ):
-                if stop_event is not None and stop_event.is_set():
-                    return report
-                score_results(
-                    {state.model: state.rows},
-                    state.records,
-                    state.cfg,
-                    state.prepared,
-                    state.output,
-                    {},
-                    "eval",
-                )
+            log(
+                f"{state.model}: geracao completa; metricas pelo cache comum do Bash. "
+                "Para executores individuais, use bash rodar_rodada.sh --metrics-only"
+            )
         return report
 
 

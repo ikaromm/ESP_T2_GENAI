@@ -61,14 +61,42 @@ def test_registered_amendments_are_pinned_disjoint_and_keep_old_contract(paid):
     assert [(a["first_case"], a["last_case_exclusive"]) for a, _ in amendments] == [
         (960, 1920),
         (1920, 3120),
+        (3120, 6000),
     ]
-    (old, old_sha), (new, sha) = amendments
+    (old, old_sha), (new, sha) = amendments[:2]
     assert old_sha == OLD_SHA and sha == new_sha()
     assert paid.paid_ling_budgets(old) == (paid.money("2.00"), None)
     assert paid.paid_ling_budgets(new) == (paid.money("3.70"), paid.money("1.70"))
     assert sum(paid.money(v) for v in new["round_budget_usd"].values()) == paid.money("7.00")
     assert new["previous_amendments_sha256"] == [OLD_SHA]
     assert new["requested_cases"] == 200
+
+
+def test_final_round_matches_remaining_cohort_and_stays_within_available_credit(
+    paid, rounds, tmp_path
+):
+    records = frozen_cohort()
+    done = {model: set(range(3120)) for model in rounds.MODELS}
+    plan = rounds.round_plan(tmp_path, records, done, 480, persist=False)
+    amendment, digest = rounds.round_amendment(plan, records)
+    assert plan["documents"] == [r["doc_id"] for r in records[520:]]
+    assert amendment["first_case"] == 3120 and amendment["last_case_exclusive"] == 6000
+    assert rounds.paid_ling_for_plan(plan, records) == digest
+    assert paid.paid_ling_budgets(amendment) == (paid.money("5.00"), paid.money("3.20"))
+    budgets = rounds.amendment_round_budgets(amendment)
+    assert budgets == {
+        "ling-free": paid.money("3.20"),
+        "qwen37": paid.money("7.30"),
+        "gemma26": paid.money("3.50"),
+    }
+    assert sum(budgets.values()) == paid.money("14.00")
+    assert sum(budgets.values()) < paid.money(amendment["account_available_before_usd"])
+    assert amendment["previous_amendments_sha256"] == [OLD_SHA, new_sha()]
+    for case in (3120, 5999):
+        assert paid.paid_ling_amendment_for_case(case)[1] == digest
+    with pytest.raises(ValueError, match="fora do adendo"):
+        paid.paid_ling_amendment_for_case(6000)
+    assert not (tmp_path / "active-round.json").exists()
 
 
 def test_edited_or_unregistered_amendment_is_rejected(paid, tmp_path, monkeypatch):
